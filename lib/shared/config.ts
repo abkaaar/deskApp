@@ -1,9 +1,9 @@
 export const APP_CONFIG = {
-  name: 'DeskApp',
-  title: 'DeskApp',
-  width: 900,
-  height: 670,
-  backgroundColor: '#1c1c1c',
-  minWidth: 640,
-  minHeight: 480,
+  name: 'Foodma Restaurant Desktop',
+  title: 'Foodma Restaurant Desktop',
+  width: 1280,
+  height: 800,
+  backgroundColor: '#0D0D0D',
+  minWidth: 1024,
+  minHeight: 640,
 } as const

@@ -1,19 +1,34 @@
-import React from 'react'
-import { SidebarProvider, SidebarTrigger, SidebarInset } from '../components/ui/sidebar'
-import { AppSidebar } from '../components/layout/Sidebar'
+import { useState, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 
-interface LayoutProps {
-  children: React.ReactNode
+import { AppSidebar } from '@/app/components/layout/Sidebar'
+import { cn } from '@/lib/utils'
+
+type LayoutProps = {
+  children: ReactNode
 }
 
 export function Layout({ children }: LayoutProps) {
+  const location = useLocation()
+  const [collapsed, setCollapsed] = useState(false)
+
+  const isCheckout =
+    location.pathname === '/' || location.pathname.startsWith('/checkout')
+
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <SidebarTrigger className="m-4 fixed bg-teal-500 hover:bg-teal-600 cursor-pointer" />
-        <main>{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
+    <div className="flex h-full min-h-0 w-full overflow-hidden bg-background">
+      <AppSidebar
+        collapsed={collapsed}
+        onToggleCollapsed={() => setCollapsed((prev) => !prev)}
+      />
+      <main
+        className={cn(
+          'min-h-0 min-w-0 flex-1 overflow-hidden',
+          isCheckout ? 'p-0' : 'overflow-y-auto p-6',
+        )}
+      >
+        {children}
+      </main>
+    </div>
   )
 }

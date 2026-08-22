@@ -1,7 +1,12 @@
 node_modules
 dist
 out
+.tsbuild
+.env
+.env.local
 .DS_Store
 *.log*
 temp
 electron.vite.config.*.mjs
+electron.vite.config.js
+electron.vite.config.d.ts

@@ -1,6 +1,17 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
   "include": ["lib/main/env.d.ts", "electron.vite.config.*", "lib/**/*", "app/components/window/**/*", "resources/**/*"],
+  "exclude": [
+    "lib/supabase/**",
+    "lib/auth/**",
+    "lib/checkout/**",
+    "lib/dashboard/**",
+    "lib/delivery/**",
+    "lib/inventory/**",
+    "lib/kds/**",
+    "lib/orders/**",
+    "lib/services/**"
+  ],
   "compilerOptions": {
     "composite": true,
     "moduleResolution": "bundler",

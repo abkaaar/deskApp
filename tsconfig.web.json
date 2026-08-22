@@ -4,7 +4,10 @@
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": ".tsbuild/web",
     "types": ["electron-vite/node"],
     "paths": {
       "@/*": ["./*"]

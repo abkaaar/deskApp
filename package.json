@@ -1,7 +1,7 @@
 {
-  "name": "deskapp",
+  "name": "foodma-desktop",
   "version": "1.0.0",
-  "description": "A lean Electron desktop app boilerplate with React, Vite, TypeScript, Shadcn UI and TailwindCSS",
+  "description": "Foodma Restaurant Desktop — unified operating system for restaurant physical and digital operations",
   "main": "./out/main/main.js",
   "license": "MIT",
   "scripts": {
@@ -9,6 +9,9 @@
     "format": "prettier --write .",
     "lint": "eslint . --ext .ts,.tsx --fix",
     "start": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
+    "typecheck": "run-s typecheck:node typecheck:web",
     "postinstall": "electron-builder install-app-deps",
     "vite:build:app": "electron-vite build",
     "electron:build:win": "electron-builder --win",
@@ -29,6 +32,7 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-switch": "^1.2.5",
     "@radix-ui/react-tooltip": "^1.2.7",
+    "@supabase/supabase-js": "^2.110.2",
     "better-sqlite3": "^12.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

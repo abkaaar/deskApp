@@ -1,7 +1,7 @@
-import { BrowserWindow, shell, app, protocol, net } from 'electron'
+import { BrowserWindow, shell, app, protocol, net, screen } from 'electron'
 import { join } from 'path'
 import { registerWindowIPC } from '@/lib/window/ipcEvents'
-import appIcon from '@/resources/build/icon.svg?asset'
+import appIcon from '@/resources/build/icon.png?asset'
 import { pathToFileURL } from 'url'
 import { APP_CONFIG } from '@/lib/shared/config'
 
@@ -17,10 +17,10 @@ export function createAppWindow(): void {
     backgroundColor: APP_CONFIG.backgroundColor,
     icon: appIcon,
     frame: false,
-    titleBarStyle: 'hiddenInset',
     title: APP_CONFIG.title,
     resizable: true,
     maximizable: true,
+    center: true,
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
       sandbox: false,
@@ -29,8 +29,26 @@ export function createAppWindow(): void {
 
   registerWindowIPC(mainWindow)
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+  const revealWindow = () => {
+    placeWindowOnScreen(mainWindow)
+    if (!mainWindow.isVisible()) mainWindow.show()
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  }
+
+  mainWindow.once('ready-to-show', revealWindow)
+
+  // Fallback if ready-to-show never fires (common with failed/slow renderer loads)
+  setTimeout(() => {
+    if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      console.warn('ready-to-show timed out — forcing window reveal')
+      revealWindow()
+    }
+  }, 2500)
+
+  mainWindow.webContents.on('did-fail-load', (_event, code, desc, url) => {
+    console.error('Renderer failed to load:', { code, desc, url })
+    revealWindow()
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -45,7 +63,37 @@ export function createAppWindow(): void {
   }
 }
 
+/** Reposition windows that ended up off any display or shrunk to a tiny ghost size. */
+export function placeWindowOnScreen(win: BrowserWindow): void {
+  if (win.isDestroyed()) return
+
+  const bounds = win.getBounds()
+  const display = screen.getDisplayNearestPoint({ x: bounds.x, y: bounds.y })
+  const area = display.workArea
+  const overlapsDisplay =
+    bounds.x < area.x + area.width &&
+    bounds.x + bounds.width > area.x &&
+    bounds.y < area.y + area.height &&
+    bounds.y + bounds.height > area.y
+  const tooSmall = bounds.width < APP_CONFIG.minWidth || bounds.height < APP_CONFIG.minHeight
+
+  if (!overlapsDisplay || tooSmall) {
+    const width = Math.min(APP_CONFIG.width, area.width)
+    const height = Math.min(APP_CONFIG.height, area.height)
+    win.setBounds({
+      x: Math.round(area.x + (area.width - width) / 2),
+      y: Math.round(area.y + (area.height - height) / 2),
+      width,
+      height,
+    })
+  } else {
+    win.center()
+  }
+}
+
 function registerResourcesProtocol() {
+  if (protocol.isProtocolHandled('res')) return
+
   protocol.handle('res', async (request) => {
     try {
       const url = new URL(request.url)

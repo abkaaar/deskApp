@@ -141,6 +141,16 @@ export class SettingsService {
     stmt.run(key, value, now)
     return { key, value, updated_at: now }
   }
+
+  remove(key: string): void {
+    const stmt = this.db.prepare(`DELETE FROM settings WHERE key = ?`)
+    stmt.run(key)
+  }
+
+  removeByPrefix(prefix: string): void {
+    const stmt = this.db.prepare(`DELETE FROM settings WHERE key LIKE ?`)
+    stmt.run(`${prefix}%`)
+  }
 }
 
 export const tasksService = new TasksService()

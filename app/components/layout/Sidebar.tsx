@@ -1,55 +1,205 @@
-import { Home, ListTodo, Settings } from 'lucide-react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { useState } from 'react'
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from '../ui/sidebar'
+  ArrowLeftRight,
+  ChefHat,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  CloudOff,
+  Settings,
+  ShoppingCart,
+  Table2,
+  Truck,
+  Users,
+  UtensilsCrossed,
+  Warehouse,
+} from 'lucide-react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+
+import { AccountAvatar, AccountSheet } from '@/app/components/layout/AccountSheet'
+import { useAuthStore } from '@/app/stores/authStore'
+import { cn, initials } from '@/lib/utils'
+import { permissionForNavHref } from '@/lib/vendor-staff-permissions'
 
 const navigation = [
-  { name: 'Home', icon: Home, href: '/' },
-  { name: 'Tasks', icon: ListTodo, href: '/tasks' },
+  { name: 'Checkout', icon: ShoppingCart, href: '/' },
+  { name: 'Transactions', icon: ArrowLeftRight, href: '/transactions' },
+  { name: 'Orders', icon: ClipboardList, href: '/orders' },
+  { name: 'Kitchen', icon: ChefHat, href: '/kitchen' },
+  { name: 'Delivery', icon: Truck, href: '/delivery' },
+  { name: 'Tables', icon: Table2, href: '/tables' },
+  { name: 'Menu', icon: UtensilsCrossed, href: '/menu' },
+  { name: 'Inventory', icon: Warehouse, href: '/inventory' },
+  { name: 'Customers', icon: Users, href: '/customers' },
   { name: 'Settings', icon: Settings, href: '/settings' },
-]
+] as const
 
-export function AppSidebar() {
+type AppSidebarProps = {
+  collapsed: boolean
+  onToggleCollapsed: () => void
+}
+
+function planPillLabel(profile: {
+  subscription_tier?: string | null
+  premium_status?: string | null
+}): string {
+  const tier = profile.subscription_tier?.trim()
+  if (tier) return `${tier} · Restaurant`
+  const status = profile.premium_status?.trim()
+  if (status) {
+    const pretty = status.charAt(0).toUpperCase() + status.slice(1)
+    return `${pretty} · Restaurant`
+  }
+  return 'Premium · Restaurant'
+}
+
+export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const profile = useAuthStore((s) => s.profile)
+  const actor = useAuthStore((s) => s.actor)
+  const staff = useAuthStore((s) => s.staff)
+  const hasPermission = useAuthStore((s) => s.hasPermission)
+  const signOut = useAuthStore((s) => s.signOut)
+  const [accountOpen, setAccountOpen] = useState(false)
+
+  const displayName =
+    actor === 'staff' && staff?.full_name
+      ? staff.full_name
+      : profile?.business_name || profile?.name || profile?.username || 'Restaurant'
+  const avatarText = initials(displayName)
+  const planText =
+    actor === 'staff'
+      ? `${staff?.role || 'staff'} · ${profile?.business_name || profile?.username || 'Restaurant'}`
+      : planPillLabel(profile ?? {})
+
+  const visibleNav = navigation.filter((item) => {
+    if (actor === 'owner') return true
+    const needed = permissionForNavHref(item.href)
+    if (!needed) return true
+    return hasPermission(needed)
+  })
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/sign-in', { replace: true })
+  }
 
   return (
-    <Sidebar className="bg-slate-800 text-white border-r-0">
-      <SidebarContent className="p-4">
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-4">
-              {navigation.map((item) => {
-                const isActive = location.pathname === item.href
-                return (
-                  <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      className={
-                        isActive
-                          ? 'bg-orange-500 text-white hover:bg-orange-500 hover:text-white'
-                          : 'text-slate-300 hover:bg-slate-700 hover:text-white'
-                      }
-                    >
-                      <NavLink to={item.href} className="flex items-center gap-3">
-                        <item.icon className="h-5 w-5" />
-                        <span>{item.name}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
+    <>
+      <aside
+        className={cn(
+          'flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-in-out',
+          collapsed ? 'w-[4.5rem]' : 'w-[260px]',
+        )}
+      >
+        <div
+          className={cn(
+            'flex shrink-0 items-start gap-2 border-b border-sidebar-border px-3.5 pt-4 pb-3',
+            collapsed ? 'flex-col items-center' : 'justify-between',
+          )}
+        >
+          <button
+            type="button"
+            onClick={() => setAccountOpen(true)}
+            title={collapsed ? displayName : undefined}
+            className={cn(
+              'min-w-0 text-left transition hover:opacity-90',
+              collapsed ? 'flex justify-center' : 'flex flex-1 items-start gap-2.5',
+            )}
+          >
+            <AccountAvatar label={avatarText} size="sm" />
+            {!collapsed && (
+              <div className="min-w-0 flex-1 pt-0.5">
+                <p className="truncate text-sm font-bold text-foreground">{displayName}</p>
+                <span className="mt-1 inline-flex max-w-full truncate rounded-full bg-info/15 px-2 py-0.5 text-[11px] font-medium text-foreground">
+                  {planText}
+                </span>
+              </div>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-muted-foreground transition hover:text-sidebar-foreground"
+          >
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+
+        <nav className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3.5 py-3">
+          <ul className="flex flex-col gap-1">
+            {visibleNav.map((item) => {
+              const isActive =
+                item.href === '/'
+                  ? location.pathname === '/'
+                  : location.pathname === item.href ||
+                    location.pathname.startsWith(`${item.href}/`)
+              return (
+                <li key={item.name}>
+                  <NavLink
+                    to={item.href}
+                    title={collapsed ? item.name : undefined}
+                    className={cn(
+                      'flex w-full items-center rounded-full text-sm font-medium transition-colors',
+                      collapsed ? 'justify-center px-0 py-3' : 'gap-3 px-3.5 py-3',
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-transparent text-foreground hover:bg-muted',
+                    )}
+                  >
+                    <item.icon
+                      className={cn(
+                        'h-5 w-5 shrink-0',
+                        isActive ? 'text-primary-foreground' : 'text-muted-foreground',
+                      )}
+                    />
+                    {!collapsed && (
+                      <span
+                        className={cn(
+                          'truncate',
+                          isActive ? 'font-semibold' : 'font-medium',
+                        )}
+                      >
+                        {item.name}
+                      </span>
+                    )}
+                  </NavLink>
+                </li>
+              )
+            })}
+          </ul>
+        </nav>
+
+        <div className="shrink-0 border-t border-sidebar-border px-3.5 py-3">
+          {collapsed ? (
+            <div
+              className="flex items-center justify-center py-2 text-muted-foreground"
+              title="Synced"
+            >
+              <CloudOff className="h-4 w-4" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 rounded-2xl bg-muted px-3 py-2.5">
+              <CloudOff className="h-4 w-4 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground">Synced</span>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <AccountSheet
+        open={accountOpen}
+        onOpenChange={setAccountOpen}
+        profile={profile}
+        onSignOut={handleSignOut}
+      />
+    </>
   )
 }

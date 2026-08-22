@@ -16,7 +16,7 @@ export function SettingsPage() {
   }, [])
 
   return (
-    <div className="p-6 max-w-4xl mt-12">
+    <div className="p-0">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -27,8 +27,8 @@ export function SettingsPage() {
       <div className="space-y-6">
         <Card className="bg-card border rounded-lg p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Palette className="h-5 w-5 text-blue-600" />
+            <div className="h-10 w-10 bg-primary-bg rounded-lg flex items-center justify-center">
+              <Palette className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h3 className="font-semibold">Appearance</h3>
@@ -49,8 +49,8 @@ export function SettingsPage() {
 
         <Card className="bg-card border rounded-lg p-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="h-10 w-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <Info className="h-5 w-5 text-yellow-600" />
+            <div className="h-10 w-10 bg-secondary/20 rounded-lg flex items-center justify-center">
+              <Info className="h-5 w-5 text-secondary" />
             </div>
             <div>
               <h3 className="font-semibold">Notifications</h3>

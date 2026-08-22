@@ -33,6 +33,16 @@ const api = {
     set: (key: string, value: string): Promise<{ key: string; value: string }> =>
       ipcRenderer.invoke('settings:set', key, value),
   },
+
+  auth: {
+    getItem: (key: string): Promise<string | null> =>
+      ipcRenderer.invoke('auth:getItem', key),
+    setItem: (key: string, value: string): Promise<void> =>
+      ipcRenderer.invoke('auth:setItem', key, value),
+    removeItem: (key: string): Promise<void> =>
+      ipcRenderer.invoke('auth:removeItem', key),
+    clearAll: (): Promise<void> => ipcRenderer.invoke('auth:clearAll'),
+  },
 }
 
 export default api

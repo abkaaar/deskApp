@@ -14,4 +14,18 @@ body,
   height: 100%;
   margin: 0;
   line-height: 1.4;
+  overflow: hidden;
+}
+
+/* Electron window content fills remaining space below titlebar */
+.window-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.window-content > * {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }

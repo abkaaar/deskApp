@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import appIcon from '@/resources/build/icon.svg'
+import appIcon from '@/resources/build/icon.png'
 import { WindowContextProvider, menuItems } from '@/lib/window'
 import { APP_CONFIG } from '@/lib/shared/config'
 import App from './app'

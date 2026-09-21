@@ -12,6 +12,7 @@ export interface PosOrderMeta {
   tableId?: string | null
   customAmounts?: string | null
   held?: boolean
+  paymentReference?: string | null
 }
 
 export type PosOrderMetaInput = {
@@ -22,6 +23,7 @@ export type PosOrderMetaInput = {
   tableId?: string | null
   customAmounts?: string | null
   held?: boolean
+  paymentReference?: string | null
 }
 
 /** Serialize POS-only metadata into the shared `orders.notes` column. */
@@ -35,6 +37,7 @@ export function encodePosNotes(meta: PosOrderMetaInput): string {
     tableId: meta.tableId || null,
     customAmounts: meta.customAmounts?.trim() || null,
     held: meta.held === true ? true : undefined,
+    paymentReference: meta.paymentReference?.trim() || null,
   })
 }
 
@@ -54,6 +57,7 @@ export function parsePosNotes(notes?: string | null): PosOrderMeta | null {
       tableId: parsed.tableId ?? null,
       customAmounts: parsed.customAmounts ?? null,
       held: parsed.held === true,
+      paymentReference: parsed.paymentReference ?? null,
     }
   } catch {
     return null

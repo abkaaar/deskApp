@@ -28,6 +28,18 @@ export type RestaurantDesktopProfile = {
   email: string | null
 }
 
+async function loadSubscriptionEntitlement(
+  supabase: SupabaseClient,
+  vendorId: string,
+) {
+  const { data } = await supabase
+    .from('vendor_subscriptions')
+    .select('status, trial_ends_at, current_period_end')
+    .eq('vendor_id', vendorId)
+    .maybeSingle()
+  return data
+}
+
 async function findProfileForAuthUser(
   supabase: SupabaseClient,
   authUserId: string,
@@ -147,9 +159,13 @@ export async function verifyRestaurantDesktopOtp(
     return { ok: false, message: AUTH_ERRORS.noProfile }
   }
 
-  if (!canAccessRestaurantDesktop(profile)) {
+  const subscription = await loadSubscriptionEntitlement(supabase, profile.id)
+  if (!canAccessRestaurantDesktop(profile, subscription)) {
     await supabase.auth.signOut({ scope: 'local' })
-    return { ok: false, message: getDesktopAccessDenialMessage(profile) }
+    return {
+      ok: false,
+      message: getDesktopAccessDenialMessage(profile, subscription),
+    }
   }
 
   if (profile.phone_verified === false) {
@@ -183,7 +199,7 @@ export async function getRestaurantDesktopProfileForUser(
     return null
   }
 
-  if (!canAccessRestaurantDesktop(profile)) {
+  if (!canAccessRestaurantDesktop(profile, await loadSubscriptionEntitlement(supabase, profile.id))) {
     return null
   }
 

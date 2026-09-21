@@ -7,6 +7,7 @@ import {
   getElapsedMinutes,
   getKdsBumpAction,
   getKdsRecallAction,
+  getTicketStatus,
 } from '@/lib/kds/ticket'
 import type { Order, OrderStatus } from '@/lib/types/order'
 import { cn } from '@/lib/utils'
@@ -22,7 +23,8 @@ export function KdsTicketCard({ order, updating, flash, onBump }: KdsTicketCardP
   const action = getKdsBumpAction(order)
   const recall = getKdsRecallAction(order)
   const elapsedMinutes = getElapsedMinutes(order)
-  const overdue = elapsedMinutes >= 15 && order.status !== 'delivered'
+  const ticketStatus = getTicketStatus(order)
+  const overdue = elapsedMinutes >= 15 && ticketStatus !== 'delivered'
 
   const runAction = async (nextStatus: OrderStatus, successLabel: string) => {
     const result = await onBump(order, nextStatus)
@@ -51,7 +53,7 @@ export function KdsTicketCard({ order, updating, flash, onBump }: KdsTicketCardP
         <div>
           <p className="text-sm font-semibold text-foreground">{formatOrderId(order.id)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {getStatusLabel(order.status, order.delivery_method)}
+            {getStatusLabel(ticketStatus, order.delivery_method)}
           </p>
         </div>
         <div

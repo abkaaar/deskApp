@@ -22,7 +22,7 @@ export function AuthGate({ children }: Props) {
       <div className="flex h-full min-h-0 items-center justify-center bg-background text-muted-foreground">
         <div className="text-center">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm">Loading Foodma Restaurant Desktop…</p>
+          <p className="text-sm">Loading FoodPos...</p>
         </div>
       </div>
     )

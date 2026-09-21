@@ -1,11 +1,13 @@
 import { getSupabaseClient } from '@/lib/supabase/client'
+import { orderStatusToKitchenStatus } from '@/lib/checkout/posOrderStatus'
 import type { Order, OrderStatus } from '@/lib/types/order'
 
 const ORDER_SELECT = `
   id, order_number, created_at, post_id, buyer_id, vendor_id, quantity, total_items,
   subtotal, service_fee, delivery_fee, total, promo_discount, delivery_method,
   delivery_address, delivery_time, payment_status, payment_reference, status,
-  confirmed_at, delivered_at, notes,
+  kitchen_status, source, pos_external_id, pos_meta, register_session_id,
+  confirmed_at, delivered_at, paid_at, notes,
   line_items:order_line_items(
     id, order_id, post_id, quantity, unit_price, subtotal, notes, selected_addons, created_at,
     post:posts(id, title, image_url, price, description, user_id)
@@ -105,6 +107,11 @@ export class OrderService {
       const supabase = getSupabaseClient()
 
       const updateData: Record<string, string | null> = { status: newStatus }
+
+      const kitchen = orderStatusToKitchenStatus(newStatus)
+      if (kitchen) {
+        updateData.kitchen_status = kitchen
+      }
 
       if (additionalData?.confirmed_at) {
         updateData.confirmed_at = additionalData.confirmed_at

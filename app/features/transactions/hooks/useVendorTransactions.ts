@@ -128,9 +128,18 @@ export function useVendorTransactions() {
     const supabase = getSupabaseClient()
     const channel = supabase
       .channel(`transactions:${vendorId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        void fetchOrders(false)
-      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `vendor_id=eq.${vendorId}`,
+        },
+        () => {
+          void fetchOrders(false)
+        },
+      )
       .subscribe()
 
     return () => {

@@ -75,7 +75,7 @@ export function KeypadSalePanel() {
             : 'cursor-not-allowed bg-muted py-3.5 text-muted-foreground',
         )}
       >
-        Review sale
+        Add to cart
       </button>
     </section>
   )

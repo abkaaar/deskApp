@@ -51,6 +51,7 @@ export function InventoryItemSheet({
   const [unit, setUnit] = useState<string>('pcs')
   const [itemType, setItemType] = useState<InventoryItemType>('ingredient')
   const [reorderLevel, setReorderLevel] = useState('')
+  const [reorderQuantity, setReorderQuantity] = useState('')
   const [costPerUnit, setCostPerUnit] = useState('')
   const [openingQuantity, setOpeningQuantity] = useState('')
   const [trackingMethod, setTrackingMethod] = useState<InventoryTrackingMethod>('quantity')
@@ -67,6 +68,7 @@ export function InventoryItemSheet({
       setUnit(item.unit)
       setItemType(item.item_type)
       setReorderLevel(String(item.reorder_level))
+      setReorderQuantity(String(item.reorder_quantity ?? 0))
       setCostPerUnit(String(item.cost_per_unit))
       setOpeningQuantity('')
       setTrackingMethod(item.tracking_method ?? 'quantity')
@@ -77,6 +79,7 @@ export function InventoryItemSheet({
       setUnit('pcs')
       setItemType('ingredient')
       setReorderLevel('')
+      setReorderQuantity('')
       setCostPerUnit('')
       setOpeningQuantity('')
       setTrackingMethod('quantity')
@@ -115,6 +118,7 @@ export function InventoryItemSheet({
         unit,
         itemType,
         reorderLevel: Number.parseFloat(reorderLevel) || 0,
+        reorderQuantity: Number.parseFloat(reorderQuantity) || 0,
         costPerUnit: Number.parseFloat(costPerUnit) || 0,
         openingQuantity: Number.parseFloat(openingQuantity) || 0,
         linkedPostId: linkedPostId || null,
@@ -241,21 +245,30 @@ export function InventoryItemSheet({
             )}
 
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Reorder level">
+              <FormField label="Reorder level (min)">
                 <Input
                   value={reorderLevel}
                   onChange={(e) => setReorderLevel(e.target.value)}
                   inputMode="decimal"
                 />
               </FormField>
-              <FormField label="Cost per unit (₦)">
+              <FormField label="Suggested reorder qty">
                 <Input
-                  value={costPerUnit}
-                  onChange={(e) => setCostPerUnit(e.target.value)}
+                  value={reorderQuantity}
+                  onChange={(e) => setReorderQuantity(e.target.value)}
                   inputMode="decimal"
+                  placeholder="Optional"
                 />
               </FormField>
             </div>
+
+            <FormField label="Cost per unit (₦)">
+              <Input
+                value={costPerUnit}
+                onChange={(e) => setCostPerUnit(e.target.value)}
+                inputMode="decimal"
+              />
+            </FormField>
 
             <FormField
               label="Link to menu item (sellable cache)"

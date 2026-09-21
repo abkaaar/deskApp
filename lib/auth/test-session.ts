@@ -7,6 +7,18 @@ import { findProfileByPhone } from '@/lib/auth/profile-lookup'
 import { DESKTOP_TEST_SESSION_KEY } from '@/lib/auth/test-auth'
 import type { RestaurantDesktopProfile } from '@/lib/auth/vendor-auth'
 
+async function loadSubscription(
+  supabase: SupabaseClient,
+  vendorId: string,
+) {
+  const { data } = await supabase
+    .from('vendor_subscriptions')
+    .select('status, trial_ends_at, current_period_end')
+    .eq('vendor_id', vendorId)
+    .maybeSingle()
+  return data
+}
+
 export async function persistTestSession(
   profile: RestaurantDesktopProfile,
 ): Promise<void> {
@@ -35,18 +47,29 @@ export async function loadPersistedTestSession(
 
     if (supabase && cached.phone) {
       const fresh = await findProfileByPhone(supabase, cached.phone)
-      if (fresh && canAccessRestaurantDesktop(fresh)) {
-        await persistTestSession(fresh)
-        return fresh
+      if (fresh) {
+        const subscription = await loadSubscription(supabase, fresh.id)
+        if (canAccessRestaurantDesktop(fresh, subscription)) {
+          await persistTestSession(fresh)
+          return fresh
+        }
+        await clearTestSession()
+        return null
       }
     }
 
-    if (!canAccessRestaurantDesktop(cached)) {
-      await clearTestSession()
-      return null
+    if (supabase) {
+      const subscription = await loadSubscription(supabase, cached.id)
+      if (!canAccessRestaurantDesktop(cached, subscription)) {
+        await clearTestSession()
+        return null
+      }
+      return cached
     }
 
-    return cached
+    // Offline / no client: cannot verify billing — drop the session.
+    await clearTestSession()
+    return null
   } catch {
     await clearTestSession()
     return null

@@ -32,6 +32,7 @@ export interface InventoryItem {
   item_type: InventoryItemType
   quantity_on_hand: number
   reorder_level: number
+  reorder_quantity: number
   cost_per_unit: number
   tracking_method: InventoryTrackingMethod
   level_value: InventoryLevelValue | null
@@ -40,6 +41,45 @@ export interface InventoryItem {
   notes: string | null
   created_at: string
   updated_at: string
+}
+
+export interface InventoryRecipeLine {
+  id: string
+  inventory_item_id: string
+  item_name?: string | null
+  quantity: number
+  unit: string
+}
+
+export interface InventoryRecipe {
+  id: string
+  vendor_id: string
+  post_id: string
+  post_title?: string | null
+  name: string
+  yield_portions: number
+  is_active: boolean
+  notes: string | null
+  lines: InventoryRecipeLine[]
+}
+
+export interface InventoryVariance {
+  inventory_item_id: string
+  name: string
+  unit: string
+  on_hand: number
+  cost_per_unit: number
+  expected_usage: number
+  ledger_usage: number
+  usage_variance: number
+  usage_variance_value: number
+  stock_count_delta: number
+  stock_count_variance_value: number
+  reorder_level: number
+  reorder_quantity: number
+  suggested_reorder: number
+  period_from: string
+  period_to: string
 }
 
 export interface InventoryMovement {
@@ -81,8 +121,11 @@ export interface InventoryAnalytics {
   waste_quantity: number
   waste_value: number
   purchase_quantity: number
+  purchase_value?: number
   sale_quantity: number
+  cogs_proxy?: number
   stock_count_variance_abs: number
+  stock_count_variance_value?: number
   open_alerts: number
 }
 
@@ -93,6 +136,7 @@ export type UpsertInventoryItemInput = {
   unit: string
   itemType: InventoryItemType
   reorderLevel?: number
+  reorderQuantity?: number
   costPerUnit?: number
   openingQuantity?: number
   linkedPostId?: string | null
@@ -107,6 +151,17 @@ export type RecordMovementInput = {
   quantity: number
   direction: InventoryMovementDirection
   notes?: string
+  unitCost?: number | null
+}
+
+export type UpsertInventoryRecipeInput = {
+  id?: string
+  vendorId: string
+  postId: string
+  name: string
+  yieldPortions: number
+  notes?: string | null
+  lines: Array<{ inventoryItemId: string; quantity: number; unit: string }>
 }
 
 export type ApplyStockCountInput = {

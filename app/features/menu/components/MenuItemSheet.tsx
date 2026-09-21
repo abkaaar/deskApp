@@ -39,6 +39,7 @@ export function MenuItemSheet({
   const [stockQuantity, setStockQuantity] = useState('')
   const [prepTime, setPrepTime] = useState('')
   const [isAvailable, setIsAvailable] = useState(true)
+  const [fulfilmentMode, setFulfilmentMode] = useState<'ready' | 'made_to_order'>('made_to_order')
   const [addons, setAddons] = useState<MenuItemAddon[]>([])
   const [loading, setLoading] = useState(false)
   const [loadingAddons, setLoadingAddons] = useState(false)
@@ -53,6 +54,7 @@ export function MenuItemSheet({
     setStockQuantity(item.stock_quantity != null ? String(item.stock_quantity) : '')
     setPrepTime(item.prep_time_minutes != null ? String(item.prep_time_minutes) : '')
     setIsAvailable(item.is_available !== false)
+    setFulfilmentMode(item.fulfilment_mode === 'ready' ? 'ready' : 'made_to_order')
 
     if (item.id) {
       setLoadingAddons(true)
@@ -80,6 +82,7 @@ export function MenuItemSheet({
         stock_quantity: parsedStock,
         prep_time_minutes: parsedPrep,
         is_available: isAvailable,
+        fulfilment_mode: fulfilmentMode,
       })
 
       if (!result.success) {
@@ -96,6 +99,7 @@ export function MenuItemSheet({
         stock_quantity: parsedStock,
         prep_time_minutes: parsedPrep,
         is_available: isAvailable,
+        fulfilment_mode: fulfilmentMode,
         updated_at: new Date().toISOString(),
       })
 
@@ -204,6 +208,39 @@ export function MenuItemSheet({
               <p className="text-xs text-muted-foreground">Hide items without deleting them</p>
             </div>
             <Switch checked={isAvailable} onCheckedChange={setIsAvailable} />
+          </div>
+
+          <div className="rounded-xl border border-border px-3 py-3 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">Fulfilment</p>
+              <p className="text-xs text-muted-foreground">
+                Ready-to-serve skips kitchen after payment
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setFulfilmentMode('ready')}
+                className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                  fulfilmentMode === 'ready'
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border'
+                }`}
+              >
+                Ready to serve
+              </button>
+              <button
+                type="button"
+                onClick={() => setFulfilmentMode('made_to_order')}
+                className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                  fulfilmentMode === 'made_to_order'
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border'
+                }`}
+              >
+                Made to order
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2">

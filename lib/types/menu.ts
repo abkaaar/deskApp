@@ -11,6 +11,7 @@ export interface MenuPost {
   stock_quantity?: number | null
   is_available?: boolean
   prep_time_minutes?: number | null
+  fulfilment_mode?: 'ready' | 'made_to_order' | null
   view_count?: number
 }
 
@@ -30,6 +31,7 @@ export type MenuPostUpdate = Partial<
     | 'stock_quantity'
     | 'is_available'
     | 'prep_time_minutes'
+    | 'fulfilment_mode'
   >
 >
 

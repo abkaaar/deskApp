@@ -88,7 +88,12 @@ export function useVendorDashboard() {
       .channel(`dashboard:${vendorId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `vendor_id=eq.${vendorId}`,
+        },
         () => {
           void fetchDashboard()
         },

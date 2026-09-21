@@ -1,3 +1,5 @@
+import { webBrandHost } from '@/lib/web-domain'
+
 export function isValidOtpCode(otp: string): boolean {
   return /^\d{6}$/.test(otp.trim())
 }
@@ -5,7 +7,7 @@ export function isValidOtpCode(otp: string): boolean {
 export const AUTH_ERRORS = {
   invalidEmail: 'Please enter a valid email address',
   emailNotRegistered:
-    'No vendor account is linked to this email. Create an account on foodma.co to get started.',
+    `No vendor account is linked to this email. Create an account on ${webBrandHost()} to get started.`,
   invalidPhone: 'Please enter a valid WhatsApp phone number',
   invalidOtp: 'Enter the 6-digit code sent to your WhatsApp',
   verifyFailed: 'Invalid or expired verification code. Please try again.',

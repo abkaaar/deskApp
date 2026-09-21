@@ -1,8 +1,11 @@
-import type { Order, OrderStatus } from '@/lib/types/order'
+import type { KitchenStatus, Order, OrderStatus } from '@/lib/types/order'
+import { effectiveKitchenLane, orderStatusToKitchenStatus } from '@/lib/checkout/posOrderStatus'
 
 const RECENT_COMPLETED_MS = 15 * 60 * 1000
 
 function isRecentCompleted(order: Order): boolean {
+  const lane = effectiveKitchenLane(order)
+  if (lane !== 'completed') return false
   if (!order.delivered_at) return false
   return Date.now() - new Date(order.delivered_at).getTime() <= RECENT_COMPLETED_MS
 }
@@ -12,11 +15,22 @@ export function getElapsedMinutes(order: Order): number {
   return Math.max(0, Math.floor((Date.now() - new Date(anchor).getTime()) / 60_000))
 }
 
+/** Display / bump status — kitchen_status for POS, else marketplace status. */
+export function getTicketStatus(order: Order): OrderStatus {
+  const kitchen = (order.kitchen_status || '').toLowerCase() as KitchenStatus | ''
+  if (kitchen === 'preparing' || kitchen === 'pending') return 'preparing'
+  if (kitchen === 'ready') return 'ready'
+  if (kitchen === 'completed') return 'delivered'
+  if (kitchen === 'cancelled') return 'cancelled'
+  return order.status
+}
+
 export function getKdsBumpAction(order: Order): {
   label: string
   nextStatus: OrderStatus
 } | null {
-  switch (order.status) {
+  const ticket = getTicketStatus(order)
+  switch (ticket) {
     case 'pending':
     case 'pending_payment':
     case 'confirmed':
@@ -35,17 +49,17 @@ export function getKdsRecallAction(order: Order): {
   label: string
   nextStatus: OrderStatus
 } | null {
-  if (order.status === 'delivered' && isRecentCompleted(order)) {
+  if (getTicketStatus(order) === 'delivered' && isRecentCompleted(order)) {
     return { label: 'Recall', nextStatus: 'ready' }
   }
   return null
 }
 
 export function splitKitchenColumns(orders: Order[]) {
-  const preparing = orders.filter((order) =>
-    ['pending', 'pending_payment', 'confirmed', 'preparing'].includes(order.status),
-  )
-  const ready = orders.filter((order) => order.status === 'ready')
-  const completed = orders.filter((order) => order.status === 'delivered')
+  const preparing = orders.filter((order) => effectiveKitchenLane(order) === 'preparing')
+  const ready = orders.filter((order) => effectiveKitchenLane(order) === 'ready')
+  const completed = orders.filter((order) => effectiveKitchenLane(order) === 'completed')
   return { preparing, ready, completed }
 }
+
+export { orderStatusToKitchenStatus }

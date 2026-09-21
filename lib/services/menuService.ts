@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '@/lib/supabase/client'
 import type { CreateMenuItemInput, MenuPost, MenuPostUpdate } from '@/lib/types/menu'
+import { assertDesktopEntitled } from '@/lib/auth/assertDesktopEntitled'
 
 import { MenuItemsService } from './menuItemsService'
 
@@ -33,6 +34,9 @@ export class MenuService {
     updates: MenuPostUpdate,
   ): Promise<{ success: boolean; error: string | null }> {
     try {
+      const entitled = await assertDesktopEntitled(vendorId)
+      if (!entitled.ok) return { success: false, error: entitled.error }
+
       const supabase = getSupabaseClient()
 
       const { data: postData, error: fetchError } = await supabase
@@ -85,6 +89,9 @@ export class MenuService {
     file: File,
   ): Promise<{ url: string | null; error: string | null }> {
     try {
+      const entitled = await assertDesktopEntitled(vendorId)
+      if (!entitled.ok) return { url: null, error: entitled.error }
+
       const supabase = getSupabaseClient()
       const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
       const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg'
@@ -116,6 +123,9 @@ export class MenuService {
     input: CreateMenuItemInput,
   ): Promise<{ data: MenuPost | null; error: string | null }> {
     try {
+      const entitled = await assertDesktopEntitled(vendorId)
+      if (!entitled.ok) return { data: null, error: entitled.error }
+
       const title = input.title.trim()
       if (!title) {
         return { data: null, error: 'Title is required' }
@@ -168,6 +178,9 @@ export class MenuService {
     vendorId: string,
   ): Promise<{ success: boolean; error: string | null }> {
     try {
+      const entitled = await assertDesktopEntitled(vendorId)
+      if (!entitled.ok) return { success: false, error: entitled.error }
+
       const supabase = getSupabaseClient()
 
       const { error } = await supabase

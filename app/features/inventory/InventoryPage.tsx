@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, RefreshCw, Warehouse } from 'lucide-react'
+import { ChefHat, Plus, RefreshCw, Warehouse } from 'lucide-react'
 
 import { Button } from '@/app/components/ui/button'
 import {
@@ -10,12 +10,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/components/ui/table'
-import { MOVEMENT_TYPE_LABELS, type InventoryItem } from '@/lib/types/inventory'
+import { MOVEMENT_TYPE_LABELS, type InventoryItem, type InventoryRecipe } from '@/lib/types/inventory'
 
 import { InventoryAnalyticsCards } from './components/InventoryAnalyticsCards'
 import { InventoryItemCard } from './components/InventoryItemCard'
 import { InventoryItemSheet } from './components/InventoryItemSheet'
 import { InventorySettingsCard } from './components/InventorySettingsCard'
+import { RecipeEditorSheet } from './components/RecipeEditorSheet'
 import { RecordMovementSheet } from './components/RecordMovementSheet'
 import { StockCountSheet } from './components/StockCountSheet'
 import { useVendorInventory } from './hooks/useVendorInventory'
@@ -28,6 +29,7 @@ export function InventoryPage() {
     alerts,
     settings,
     analytics,
+    recipes,
     loading,
     error,
     refresh,
@@ -37,7 +39,9 @@ export function InventoryPage() {
   const [itemSheetOpen, setItemSheetOpen] = useState(false)
   const [movementSheetOpen, setMovementSheetOpen] = useState(false)
   const [stockCountSheetOpen, setStockCountSheetOpen] = useState(false)
+  const [recipeSheetOpen, setRecipeSheetOpen] = useState(false)
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
+  const [selectedRecipe, setSelectedRecipe] = useState<InventoryRecipe | null>(null)
 
   const handleEdit = (item: InventoryItem) => {
     setSelectedItem(item)
@@ -57,6 +61,16 @@ export function InventoryPage() {
   const handleAddItem = () => {
     setSelectedItem(null)
     setItemSheetOpen(true)
+  }
+
+  const handleAddRecipe = () => {
+    setSelectedRecipe(null)
+    setRecipeSheetOpen(true)
+  }
+
+  const handleEditRecipe = (recipe: InventoryRecipe) => {
+    setSelectedRecipe(recipe)
+    setRecipeSheetOpen(true)
   }
 
   return (
@@ -81,6 +95,15 @@ export function InventoryPage() {
           >
             <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
             Refresh
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleAddRecipe}
+            className="gap-2 rounded-full"
+          >
+            <ChefHat className="h-4 w-4" />
+            Recipe
           </Button>
           <Button type="button" onClick={handleAddItem} className="gap-2 rounded-full">
             <Plus className="h-4 w-4" />
@@ -124,6 +147,33 @@ export function InventoryPage() {
               onStockCount={handleStockCount}
             />
           ))}
+        </div>
+      )}
+
+      {recipes.length > 0 && (
+        <div className="rounded-2xl border border-border bg-card px-4 py-3">
+          <h2 className="text-base font-semibold text-foreground">Recipes (Advanced BOM)</h2>
+          <ul className="mt-2 space-y-2">
+            {recipes.map((recipe) => (
+              <li key={recipe.id} className="flex items-center justify-between gap-3 text-sm">
+                <div>
+                  <p className="font-medium text-foreground">{recipe.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {recipe.post_title ?? 'Menu item'} · {recipe.lines.length} ingredient
+                    {recipe.lines.length === 1 ? '' : 's'} · yield {recipe.yield_portions}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleEditRecipe(recipe)}
+                >
+                  Edit
+                </Button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -185,6 +235,15 @@ export function InventoryPage() {
         onOpenChange={setStockCountSheetOpen}
         item={selectedItem}
         onCounted={() => void refresh()}
+      />
+
+      <RecipeEditorSheet
+        open={recipeSheetOpen}
+        onOpenChange={setRecipeSheetOpen}
+        vendorId={vendorId}
+        items={items}
+        recipe={selectedRecipe}
+        onSaved={() => void refresh()}
       />
     </div>
   )

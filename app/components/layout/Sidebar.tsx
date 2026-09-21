@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ArrowLeftRight,
   ChefHat,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Cloud,
   CloudOff,
   Settings,
   ShoppingCart,
@@ -18,8 +19,11 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 
 import { AccountAvatar, AccountSheet } from '@/app/components/layout/AccountSheet'
 import { useAuthStore } from '@/app/stores/authStore'
+import { useSyncStore } from '@/app/stores/syncStore'
+import { isBrowserOffline } from '@/lib/checkout/saleOutbox'
 import { cn, initials } from '@/lib/utils'
 import { permissionForNavHref } from '@/lib/vendor-staff-permissions'
+import { toast } from 'sonner'
 
 const navigation = [
   { name: 'Checkout', icon: ShoppingCart, href: '/' },
@@ -62,6 +66,68 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps) {
   const hasPermission = useAuthStore((s) => s.hasPermission)
   const signOut = useAuthStore((s) => s.signOut)
   const [accountOpen, setAccountOpen] = useState(false)
+  const online = useSyncStore((s) => s.online)
+  const pendingCount = useSyncStore((s) => s.pendingCount)
+  const attentionCount = useSyncStore((s) => s.attentionCount)
+  const flushing = useSyncStore((s) => s.flushing)
+  const lastError = useSyncStore((s) => s.lastError)
+  const flush = useSyncStore((s) => s.flush)
+  const bindBrowserListeners = useSyncStore((s) => s.bindBrowserListeners)
+
+  useEffect(() => bindBrowserListeners(), [bindBrowserListeners])
+
+  const syncLabel = !online
+    ? pendingCount > 0
+      ? `Offline · ${pendingCount} pending`
+      : attentionCount > 0
+        ? `Offline · ${attentionCount} need attention`
+        : 'Offline ready'
+    : flushing
+      ? 'Syncing…'
+      : pendingCount > 0
+        ? `${pendingCount} pending`
+        : attentionCount > 0
+          ? `${attentionCount} need attention`
+          : 'Synced'
+
+  const handleCloudClick = async () => {
+    if (flushing) return
+    if (!online && isBrowserOffline()) {
+      toast.error('Reconnect to sync', {
+        description:
+          pendingCount > 0
+            ? `${pendingCount} cash sale${pendingCount === 1 ? '' : 's'} waiting.`
+            : undefined,
+      })
+      return
+    }
+
+    const result = await flush({ retryFailed: attentionCount > 0, probe: true })
+
+    if (!result.online) {
+      toast.error('Reconnect to sync')
+      return
+    }
+    if (result.flushed > 0) {
+      toast.success(
+        `Synced ${result.flushed} sale${result.flushed === 1 ? '' : 's'}`,
+        result.attention > 0
+          ? { description: `${result.attention} still need attention.` }
+          : undefined,
+      )
+      return
+    }
+    if (result.attention > 0 || result.remaining > 0) {
+      toast.error(result.lastError || 'Could not sync all sales', {
+        description:
+          result.attention > 0
+            ? `${result.attention} need attention.`
+            : `${result.remaining} still pending.`,
+      })
+      return
+    }
+    toast.success('Already synced')
+  }
 
   const displayName =
     actor === 'staff' && staff?.full_name
@@ -179,17 +245,39 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps) {
 
         <div className="shrink-0 border-t border-sidebar-border px-3.5 py-3">
           {collapsed ? (
-            <div
-              className="flex items-center justify-center py-2 text-muted-foreground"
-              title="Synced"
+            <button
+              type="button"
+              onClick={() => void handleCloudClick()}
+              disabled={flushing}
+              className="flex w-full items-center justify-center rounded-2xl py-2 text-muted-foreground transition hover:bg-muted disabled:opacity-60"
+              title={lastError ? `${syncLabel} — ${lastError}` : `${syncLabel} — click to sync`}
             >
-              <CloudOff className="h-4 w-4" />
-            </div>
+              {online && pendingCount === 0 && attentionCount === 0 ? (
+                <Cloud className="h-4 w-4" />
+              ) : (
+                <CloudOff className="h-4 w-4" />
+              )}
+            </button>
           ) : (
-            <div className="flex items-center gap-1.5 rounded-2xl bg-muted px-3 py-2.5">
-              <CloudOff className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Synced</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => void handleCloudClick()}
+              disabled={flushing}
+              className="flex w-full flex-col gap-0.5 rounded-2xl bg-muted px-3 py-2.5 text-left transition hover:bg-muted/80 disabled:opacity-60"
+              title={lastError ?? 'Click to sync pending sales'}
+            >
+              <span className="flex items-center gap-1.5">
+                {online && pendingCount === 0 && attentionCount === 0 ? (
+                  <Cloud className="h-4 w-4 shrink-0 text-muted-foreground" />
+                ) : (
+                  <CloudOff className="h-4 w-4 shrink-0 text-muted-foreground" />
+                )}
+                <span className="text-xs font-medium text-muted-foreground">{syncLabel}</span>
+              </span>
+              {lastError ? (
+                <span className="line-clamp-2 pl-5 text-[10px] text-destructive">{lastError}</span>
+              ) : null}
+            </button>
           )}
         </div>
       </aside>

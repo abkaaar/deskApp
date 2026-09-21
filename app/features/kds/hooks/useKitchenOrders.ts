@@ -145,9 +145,18 @@ export function useKitchenOrders() {
     const supabase = getSupabaseClient()
     const channel = supabase
       .channel(`kds:${vendorId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        scheduleRefresh()
-      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `vendor_id=eq.${vendorId}`,
+        },
+        () => {
+          scheduleRefresh()
+        },
+      )
       .subscribe()
 
     return () => {
@@ -242,6 +251,16 @@ export function useKitchenOrders() {
               ? {
                   ...row,
                   status: nextStatus,
+                  kitchen_status:
+                    nextStatus === 'delivered'
+                      ? 'completed'
+                      : nextStatus === 'ready'
+                        ? 'ready'
+                        : nextStatus === 'preparing'
+                          ? 'preparing'
+                          : nextStatus === 'cancelled'
+                            ? 'cancelled'
+                            : row.kitchen_status,
                   ...(nextStatus === 'delivered'
                     ? { delivered_at: deliveredAt }
                     : nextStatus === 'ready' && order.status === 'delivered'

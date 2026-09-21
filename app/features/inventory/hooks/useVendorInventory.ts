@@ -17,6 +17,7 @@ export function useVendorInventory() {
   const [alerts, setAlerts] = useState<InventoryAlert[]>([])
   const [settings, setSettings] = useState<VendorInventorySettings | null>(null)
   const [analytics, setAnalytics] = useState<InventoryAnalytics | null>(null)
+  const [recipes, setRecipes] = useState<import('@/lib/types/inventory').InventoryRecipe[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -27,30 +28,35 @@ export function useVendorInventory() {
       setAlerts([])
       setSettings(null)
       setAnalytics(null)
+      setRecipes([])
       setLoading(false)
       return
     }
 
     setLoading(true)
-    const [itemsRes, movementsRes, alertsRes, settingsRes, analyticsRes] = await Promise.all([
-      InventoryService.getItems(vendorId),
-      InventoryService.getMovements(vendorId, 50),
-      InventoryService.getAlerts(vendorId),
-      InventoryService.getSettings(vendorId),
-      InventoryService.getAnalytics(vendorId, 30),
-    ])
+    const [itemsRes, movementsRes, alertsRes, settingsRes, analyticsRes, recipesRes] =
+      await Promise.all([
+        InventoryService.getItems(vendorId),
+        InventoryService.getMovements(vendorId, 50),
+        InventoryService.getAlerts(vendorId),
+        InventoryService.getSettings(vendorId),
+        InventoryService.getAnalytics(vendorId, 30),
+        InventoryService.getRecipes(vendorId),
+      ])
 
     setItems(itemsRes.data)
     setMovements(movementsRes.data)
     setAlerts(alertsRes.data)
     setSettings(settingsRes.data)
     setAnalytics(analyticsRes.data)
+    setRecipes(recipesRes.data)
     setError(
       itemsRes.error ||
         movementsRes.error ||
         alertsRes.error ||
         settingsRes.error ||
-        analyticsRes.error,
+        analyticsRes.error ||
+        recipesRes.error,
     )
     setLoading(false)
   }, [vendorId])
@@ -66,6 +72,7 @@ export function useVendorInventory() {
     alerts,
     settings,
     analytics,
+    recipes,
     loading,
     error,
     refresh,

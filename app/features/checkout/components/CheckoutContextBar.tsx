@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 
 import { CustomerService } from '@/lib/services/customerService'
 import { TableService } from '@/lib/services/tableService'
@@ -22,9 +23,14 @@ export function CheckoutContextBar({ vendorId, showContext }: CheckoutContextBar
   const setTable = useCheckoutStore((s) => s.setTable)
 
   const [customerOpen, setCustomerOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
   const [tableOpen, setTableOpen] = useState(false)
   const [customers, setCustomers] = useState<VendorCustomer[]>([])
   const [tables, setTables] = useState<RestaurantTable[]>([])
+  const [saving, setSaving] = useState(false)
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
 
   useEffect(() => {
     if (!vendorId || (!customerOpen && !tableOpen)) return
@@ -53,6 +59,31 @@ export function CheckoutContextBar({ vendorId, showContext }: CheckoutContextBar
       ] as const,
     [],
   )
+
+  const handleCreate = async () => {
+    if (!vendorId || !name.trim()) return
+    setSaving(true)
+    try {
+      const result = await CustomerService.createCustomer(vendorId, {
+        name: name.trim(),
+        phone: phone.trim() || undefined,
+        email: email.trim() || undefined,
+      })
+      if (result.error || !result.data) {
+        toast.error(result.error || 'Could not save customer')
+        return
+      }
+      setCustomer(result.data.id, result.data.name || result.data.phone || 'Customer')
+      setAddOpen(false)
+      setCustomerOpen(false)
+      setName('')
+      setPhone('')
+      setEmail('')
+      toast.success('Customer saved')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -117,6 +148,13 @@ export function CheckoutContextBar({ vendorId, showContext }: CheckoutContextBar
               >
                 Walk-in (no customer)
               </button>
+              <button
+                type="button"
+                className="w-full rounded-xl px-3 py-3 text-left text-sm font-semibold text-primary hover:bg-muted"
+                onClick={() => setAddOpen(true)}
+              >
+                Add new customer
+              </button>
               {customers.map((c) => (
                 <button
                   key={c.id}
@@ -146,6 +184,54 @@ export function CheckoutContextBar({ vendorId, showContext }: CheckoutContextBar
                 onClick={() => setCustomerOpen(false)}
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {addOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-[20px] border border-border bg-card shadow-xl">
+            <div className="border-b border-border px-4 py-3">
+              <h3 className="text-lg font-bold">Add customer</h3>
+            </div>
+            <div className="space-y-3 p-4">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Name"
+                className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+              />
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Phone"
+                className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+              />
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email"
+                className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+              />
+            </div>
+            <div className="flex gap-2 border-t border-border p-3">
+              <button
+                type="button"
+                className="flex-1 rounded-full py-2 text-sm font-medium text-muted-foreground hover:bg-muted"
+                onClick={() => setAddOpen(false)}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving || !name.trim()}
+                onClick={() => void handleCreate()}
+                className="flex-[1.4] rounded-full bg-primary py-2 text-sm font-bold text-primary-foreground disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save'}
               </button>
             </div>
           </div>

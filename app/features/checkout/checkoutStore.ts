@@ -44,6 +44,8 @@ export type SaleSubmitSnapshot = {
     subtotal: number
     notes?: string
     is_custom?: boolean
+    fulfilment_mode?: 'ready' | 'made_to_order'
+    title?: string
     selected_addons?: {
       id: string
       title: string
@@ -58,6 +60,7 @@ export type SaleSubmitSnapshot = {
   customerId: string | null
   customerName: string | null
   tableId: string | null
+  tableLabel: string | null
 }
 
 type CheckoutState = {
@@ -157,6 +160,7 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
               sub_items: [],
               subtotal: lineSubtotal(price, 1),
               is_custom: false,
+              fulfilment_mode: post.fulfilment_mode === 'ready' ? 'ready' : 'made_to_order',
             },
           ],
         }
@@ -181,6 +185,7 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
             subtotal: lineSubtotal(unitPrice, 1),
             is_custom: false,
             notes: addons.map((a) => a.title).join(', '),
+            fulfilment_mode: post.fulfilment_mode === 'ready' ? 'ready' : 'made_to_order',
             selected_addons: addons.map((a) => ({
               id: a.id,
               title: a.title,
@@ -211,6 +216,7 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
           subtotal: lineSubtotal(price, 1),
           notes: title,
           is_custom: true,
+          fulfilment_mode: 'ready',
         },
       ],
       customAmount: '',
@@ -315,6 +321,7 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
       customerId: state.customerId,
       customerName: state.customerName,
       tableId: state.tableId,
+      tableLabel: state.tableLabel,
     }
     set({ isSubmitting: true })
     return snapshot
@@ -364,6 +371,9 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
       subtotal: line.subtotal,
       notes: line.notes,
       is_custom: line.is_custom === true,
+      title: line.title,
+      fulfilment_mode:
+        line.is_custom || line.fulfilment_mode === 'ready' ? 'ready' : 'made_to_order',
       selected_addons: line.selected_addons,
     })),
 }))

@@ -38,9 +38,13 @@ export function InventoryAnalyticsCards({ analytics, loading }: InventoryAnalyti
     },
     {
       icon: Boxes,
-      label: 'Count variance',
-      value: analytics ? String(analytics.stock_count_variance_abs) : '—',
-      hint: 'Abs. stock-count deltas',
+      label: 'COGS proxy / variance',
+      value: analytics
+        ? formatNaira(analytics.cogs_proxy ?? 0)
+        : '—',
+      hint: analytics
+        ? `Count Δ ${analytics.stock_count_variance_abs} · ${formatNaira(analytics.stock_count_variance_value ?? 0)}`
+        : 'Sales cost + count Δ',
     },
   ] as const
 

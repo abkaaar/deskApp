@@ -71,6 +71,17 @@ export function InventoryItemCard({
         </div>
       </div>
 
+      {status !== 'healthy' && (
+        <p className="mt-2 text-xs text-warning">
+          Suggest reorder{' '}
+          {(item.reorder_quantity > 0
+            ? item.reorder_quantity
+            : Math.max(item.reorder_level * 2 - item.quantity_on_hand, item.reorder_level)
+          ).toFixed(1)}{' '}
+          {item.unit}
+        </p>
+      )}
+
       <div className="mt-4 flex flex-wrap gap-2">
         <Button
           variant="outline"

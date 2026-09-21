@@ -36,6 +36,7 @@ export function RecordMovementSheet({
   const [movementType, setMovementType] = useState<InventoryMovementType>('purchase')
   const [quantity, setQuantity] = useState('')
   const [notes, setNotes] = useState('')
+  const [unitCost, setUnitCost] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export function RecordMovementSheet({
     setMovementType('purchase')
     setQuantity('')
     setNotes('')
+    setUnitCost(item?.cost_per_unit ? String(item.cost_per_unit) : '')
   }, [open, item])
 
   if (!item) return null
@@ -64,6 +66,10 @@ export function RecordMovementSheet({
         quantity: qty,
         direction,
         notes: notes.trim() || undefined,
+        unitCost:
+          movementType === 'purchase' && Number.isFinite(Number.parseFloat(unitCost))
+            ? Number.parseFloat(unitCost)
+            : null,
       })
 
       if (!result.success) {
@@ -140,6 +146,20 @@ export function RecordMovementSheet({
             </label>
             <Input value={quantity} onChange={(e) => setQuantity(e.target.value)} inputMode="decimal" />
           </div>
+
+          {movementType === 'purchase' && (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Unit cost (₦)
+              </label>
+              <Input
+                value={unitCost}
+                onChange={(e) => setUnitCost(e.target.value)}
+                inputMode="decimal"
+                placeholder="Optional purchase cost"
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

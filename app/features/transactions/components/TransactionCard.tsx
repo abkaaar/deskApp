@@ -4,7 +4,8 @@ import { toast } from 'sonner'
 import { Badge } from '@/app/components/ui/badge'
 import { useAuthStore } from '@/app/stores/authStore'
 import { formatCurrency } from '@/lib/checkout/format'
-import { buildReceiptText, refundPosOrder } from '@/lib/checkout/refundReceipt'
+import { buildReceiptText, printReceiptText, shareReceiptText } from '@/lib/receipt/receiptService'
+import { refundPosOrder } from '@/lib/checkout/refundReceipt'
 import { formatOrderId, getStatusLabel } from '@/lib/orders/status'
 import { cn } from '@/lib/utils'
 
@@ -47,12 +48,15 @@ export function TransactionCard({ row, onChanged }: TransactionCardProps) {
       order,
       profile?.business_name || profile?.name || profile?.username,
     )
-    try {
-      await navigator.clipboard.writeText(text)
-      toast.success('Receipt copied')
-    } catch {
-      window.alert(text)
-    }
+    await shareReceiptText(text)
+  }
+
+  const printReceipt = () => {
+    const text = buildReceiptText(
+      order,
+      profile?.business_name || profile?.name || profile?.username,
+    )
+    printReceiptText(text)
   }
 
   const handleRefund = async () => {
@@ -126,7 +130,14 @@ export function TransactionCard({ row, onChanged }: TransactionCardProps) {
           onClick={() => void showReceipt()}
           className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold"
         >
-          Receipt
+          Copy receipt
+        </button>
+        <button
+          type="button"
+          onClick={printReceipt}
+          className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold"
+        >
+          Print
         </button>
         {canRefund && (
           <button

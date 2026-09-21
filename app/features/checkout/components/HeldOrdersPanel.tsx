@@ -76,19 +76,53 @@ export function HeldOrdersPanel({ onResumePaid }: HeldOrdersPanelProps) {
       const supabase = getSupabaseClient()
       const meta = parsePosNotes(order.notes)
       const now = new Date().toISOString()
+      const orderType = meta?.orderType ?? 'takeaway'
+      // Prefer kitchen_status when present; otherwise infer from notes / custom-only meta.
+      const posMeta =
+        order.pos_meta && typeof order.pos_meta === 'object'
+          ? (order.pos_meta as Record<string, unknown>)
+          : {}
+      let needsKitchen = false
+      if (typeof posMeta.needs_kitchen === 'boolean') {
+        needsKitchen = posMeta.needs_kitchen
+      } else if (Array.isArray(posMeta.lines)) {
+        needsKitchen = (posMeta.lines as { fulfilment_mode?: string }[]).some(
+          (l) => l.fulfilment_mode === 'made_to_order',
+        )
+      } else {
+        const customOnly =
+          Boolean(posMeta.custom_amounts) &&
+          !order.post_id &&
+          (!order.line_items || order.line_items.length === 0)
+        needsKitchen = !customOnly && Boolean(order.post_id)
+      }
+      const kitchenStatus = needsKitchen ? 'preparing' : 'completed'
+      const status =
+        kitchenStatus === 'completed'
+          ? 'delivered'
+          : orderType === 'delivery'
+            ? 'confirmed'
+            : 'preparing'
       const { error } = await supabase
         .from('orders')
         .update({
           payment_status: 'paid',
-          status: meta?.orderType === 'delivery' ? 'confirmed' : 'delivered',
+          status,
+          kitchen_status: kitchenStatus,
           paid_at: now,
           confirmed_at: now,
-          delivered_at: meta?.orderType === 'delivery' ? null : now,
+          delivered_at: status === 'delivered' ? now : null,
           notes: JSON.stringify({
             ...(meta ?? { type: 'pos', orderType: 'takeaway', paymentMethod: method }),
             paymentMethod: method,
             held: false,
           }),
+          pos_meta: {
+            ...posMeta,
+            payment_method: method,
+            held: false,
+            order_type: orderType,
+          },
         })
         .eq('id', order.id)
         .eq('vendor_id', profile.id)

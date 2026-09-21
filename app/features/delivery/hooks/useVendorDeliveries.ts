@@ -68,6 +68,18 @@ export function useVendorDeliveries() {
           void refresh()
         },
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `vendor_id=eq.${vendorId}`,
+        },
+        () => {
+          void refresh()
+        },
+      )
       .subscribe()
 
     return () => {

@@ -7,6 +7,13 @@ export type OrderStatus =
   | 'delivered'
   | 'cancelled'
 
+export type KitchenStatus =
+  | 'pending'
+  | 'preparing'
+  | 'ready'
+  | 'completed'
+  | 'cancelled'
+
 export type DeliveryMethod = 'pickup' | 'delivery'
 
 export type DeliveryStatus =
@@ -65,8 +72,15 @@ export interface Order {
   payment_status?: 'pending' | 'paid' | 'failed' | 'refunded'
   payment_reference?: string | null
   status: OrderStatus
+  /** POS kitchen ladder; prefer this for KDS when source === 'pos'. */
+  kitchen_status?: KitchenStatus | null
+  source?: 'marketplace' | 'pos' | string | null
+  pos_external_id?: string | null
+  pos_meta?: Record<string, unknown> | null
+  register_session_id?: string | null
   confirmed_at?: string
   delivered_at?: string
+  paid_at?: string
   notes?: string
   line_items?: OrderLineItem[]
   post?: {

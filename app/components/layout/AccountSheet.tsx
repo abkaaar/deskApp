@@ -122,7 +122,7 @@ export function AccountSheet({ open, onOpenChange, profile, onSignOut }: Account
             <Info className="mb-2 h-4 w-4 text-info" />
             <p className="text-sm font-bold">You&apos;re on {plan}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Foodma Restaurant Desktop is ready for checkout, kitchen, and delivery
+              Foodpos is ready for checkout, kitchen, and delivery
               tools for your team.
             </p>
             <p className="mt-2 text-sm font-medium text-info underline-offset-2">

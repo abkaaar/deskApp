@@ -1,5 +1,5 @@
-appId: com.deskapp.boilerplate
-productName: DeskApp
+appId: co.foodma.foodpos
+productName: Foodpos
 directories:
   buildResources: resources/build
 files:
@@ -12,9 +12,12 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: DeskApp
+  executableName: Foodpos
+  icon: icon.ico
+  # Avoid winCodeSign extract (needs symlink privilege / Developer Mode on Windows)
+  signAndEditExecutable: false
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: Foodpos-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
@@ -27,17 +30,15 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: Foodpos-${version}.${ext}
 linux:
   target:
     - AppImage
-    - snap
     - deb
-  maintainer: electronjs.org
-  category: Utility
+  maintainer: foodma.co
+  category: Office
+  executableName: Foodpos
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: Foodpos-${version}.${ext}
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates
+# Auto-update disabled for v1 — ship installers via GitHub Releases only.

@@ -1,7 +1,8 @@
 {
   "name": "foodma-desktop",
   "version": "1.0.0",
-  "description": "Foodma Restaurant Desktop — unified operating system for restaurant physical and digital operations",
+  "description": "Foodpos — restaurant POS and operations for the Foodma ecosystem",
+  "author": "Foodma",
   "main": "./out/main/main.js",
   "license": "MIT",
   "scripts": {

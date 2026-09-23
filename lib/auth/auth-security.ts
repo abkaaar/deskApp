@@ -12,10 +12,10 @@ export const AUTH_ERRORS = {
   invalidOtp: 'Enter the 6-digit code sent to your WhatsApp',
   verifyFailed: 'Invalid or expired verification code. Please try again.',
   notPremium:
-    'Foodma Restaurant Desktop is for approved premium restaurant accounts only.',
+    'Foodpos is for approved premium restaurant accounts only.',
   notRestaurant:
     'This app is for restaurant businesses only. Other vendor types should use the Foodma mobile app.',
-  noDesktopAccess: 'Your account does not have access to Foodma Restaurant Desktop.',
+  noDesktopAccess: 'Your account does not have access to Foodpos.',
   noProfile: 'No vendor account is linked to this phone number.',
   tooManyAttempts: 'Too many attempts. Request a new code and try again.',
   sendFailed: 'Could not send verification code. Please try again shortly.',

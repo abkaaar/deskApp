@@ -1,5 +1,5 @@
 /**
- * Shared product entitlement helpers for Foodma Desktop.
+ * Shared product entitlement helpers for Foodpos.
  */
 
 export type EntitlementProfile = {

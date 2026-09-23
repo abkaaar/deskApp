@@ -45,6 +45,7 @@ export async function requestStaffSignIn(
     const payload = (await res.json().catch(() => ({}))) as {
       success?: boolean
       error?: string
+      detail?: string
       access_token?: string
       expires_at?: string
       vendor?: Record<string, unknown>
@@ -57,9 +58,14 @@ export async function requestStaffSignIn(
     }
 
     if (!res.ok || !payload.success || !payload.access_token || !payload.vendor || !payload.staff) {
+      const base = payload.error || 'Invalid email or access code'
+      const message =
+        payload.detail && base === 'Something went wrong'
+          ? `${base}: ${payload.detail}`
+          : base
       return {
         ok: false,
-        message: payload.error || 'Invalid email or access code',
+        message,
       }
     }
 

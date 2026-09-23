@@ -28,13 +28,13 @@ export function getDesktopAccessDenialMessage(
   subscription?: EntitlementSubscription | null,
 ): string {
   if (profile.role?.toLowerCase() !== 'premium') {
-    return 'Foodma Restaurant Desktop requires an approved premium restaurant account.'
+    return 'Foodpos requires an approved premium restaurant account.'
   }
   if (profile.vendor_type?.toLowerCase() !== 'restaurant') {
     return 'This app is for restaurant businesses only. Other vendor types should use the Foodma mobile app.'
   }
   if (!canUseProduct(profile, subscription)) {
-    return `Your trial or subscription is inactive. Subscribe on ${webBrandHost()} to continue using Desktop.`
+    return `Your trial or subscription is inactive. Subscribe on ${webBrandHost()} to continue using Foodpos.`
   }
-  return 'Your account does not have access to Foodma Restaurant Desktop.'
+  return 'Your account does not have access to Foodpos.'
 }

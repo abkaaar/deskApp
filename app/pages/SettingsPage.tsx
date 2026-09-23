@@ -150,7 +150,7 @@ export function SettingsPage() {
           <div className="flex items-center gap-3 mb-4">
             <div>
               <h3 className="font-semibold">About</h3>
-              <p className="text-sm text-muted-foreground">{APP_CONFIG.name} desktop</p>
+              <p className="text-sm text-muted-foreground">{APP_CONFIG.name}</p>
             </div>
           </div>
 

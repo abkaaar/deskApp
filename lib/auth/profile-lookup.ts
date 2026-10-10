@@ -4,7 +4,7 @@ import { formatPhoneNumber } from '@/lib/auth/phone'
 import type { RestaurantDesktopProfile } from '@/lib/auth/vendor-auth'
 
 export const PROFILE_FIELDS =
-  'id, username, phone, name, business_name, role, premium_status, subscription_tier, avatar_url, email, phone_verified, vendor_type'
+  'id, username, phone, name, business_name, role, premium_status, subscription_tier, avatar_url, email, phone_verified, email_verified, vendor_type'
 
 function phoneDigits(phone: string): string {
   return formatPhoneNumber(phone).replace(/\D/g, '')
@@ -16,6 +16,15 @@ export function phonesMatch(
 ): boolean {
   if (!a || !b) return false
   return phoneDigits(a) === phoneDigits(b)
+}
+
+export function emailsMatch(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  const left = (a || '').trim().toLowerCase()
+  const right = (b || '').trim().toLowerCase()
+  return Boolean(left && right && left === right)
 }
 
 function toProfile(row: Record<string, unknown>): RestaurantDesktopProfile {

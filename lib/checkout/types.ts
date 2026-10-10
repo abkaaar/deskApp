@@ -66,7 +66,7 @@ export interface CreatePosOrderPayload {
   customerId?: string | null
   tableId?: string | null
   discount?: number
-  /** Unpaid hold — skip stock decrement and mark pending. */
+  /** @deprecated Holds are local SQLite carts; createPosOrderFromCart rejects hold:true. */
   hold?: boolean
   /** Optional till session (deferred from MVP). */
   registerSessionId?: string | null

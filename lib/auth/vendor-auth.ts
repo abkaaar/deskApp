@@ -6,12 +6,11 @@ import {
   getDesktopAccessDenialMessage,
 } from '@/lib/auth/desktop-access'
 import {
-  findProfileByPhone,
-  phonesMatch,
+  emailsMatch,
+  findProfileByEmail,
   PROFILE_FIELDS,
 } from '@/lib/auth/profile-lookup'
-import { formatPhoneNumber } from '@/lib/auth/phone'
-import { isTestPhoneNumber } from '@/lib/auth/test-auth'
+import { isTestEmail } from '@/lib/auth/test-auth'
 import { verifyTestRestaurantDesktopOtp } from '@/lib/auth/test-session-verify'
 
 export type RestaurantDesktopProfile = {
@@ -31,21 +30,44 @@ export type RestaurantDesktopProfile = {
 async function loadSubscriptionEntitlement(
   supabase: SupabaseClient,
   vendorId: string,
+  authUserId?: string | null,
 ) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('vendor_subscriptions')
     .select('status, trial_ends_at, current_period_end')
     .eq('vendor_id', vendorId)
     .maybeSingle()
+
+  if (error) {
+    console.warn('[vendor-auth] subscription lookup failed:', error.message)
+  }
+  if (data) return data
+
+  // Soft-migrate: auth.uid may differ from profiles.id; try session uid as fallback.
+  if (authUserId && authUserId !== vendorId) {
+    const { data: byAuth, error: byAuthError } = await supabase
+      .from('vendor_subscriptions')
+      .select('status, trial_ends_at, current_period_end')
+      .eq('vendor_id', authUserId)
+      .maybeSingle()
+    if (byAuthError) {
+      console.warn(
+        '[vendor-auth] subscription lookup by auth id failed:',
+        byAuthError.message,
+      )
+    }
+    if (byAuth) return byAuth
+  }
+
   return data
 }
 
 async function findProfileForAuthUser(
   supabase: SupabaseClient,
   authUserId: string,
-  phone: string,
-): Promise<(RestaurantDesktopProfile & { phone_verified?: boolean }) | null> {
-  const formattedPhone = formatPhoneNumber(phone)
+  email: string,
+): Promise<(RestaurantDesktopProfile & { email_verified?: boolean }) | null> {
+  const normalizedEmail = email.trim().toLowerCase()
 
   const { data: byId, error: byIdError } = await supabase
     .from('profiles')
@@ -56,52 +78,56 @@ async function findProfileForAuthUser(
   if (byIdError) {
     console.warn('[vendor-auth] profile lookup by id failed:', byIdError.message)
   }
-  if (byId && phonesMatch(byId.phone, formattedPhone)) {
-    return byId as RestaurantDesktopProfile & { phone_verified?: boolean }
+  if (byId && emailsMatch(byId.email, normalizedEmail)) {
+    return byId as RestaurantDesktopProfile & { email_verified?: boolean }
+  }
+  if (byId?.id === authUserId) {
+    return byId as RestaurantDesktopProfile & { email_verified?: boolean }
   }
 
-  const byPhone = await findProfileByPhone(supabase, formattedPhone)
-  if (!byPhone) {
+  const byEmail = await findProfileByEmail(supabase, normalizedEmail)
+  if (!byEmail) {
     return null
   }
 
-  if (byPhone.id !== authUserId) {
+  if (byEmail.id !== authUserId) {
     const { error: linkError } = await supabase
       .from('profiles')
       .update({
         id: authUserId,
         updated_at: new Date().toISOString(),
       })
-      .eq('phone', byPhone.phone)
+      .eq('id', byEmail.id)
 
     if (linkError) {
       console.warn('[vendor-auth] profile id link skipped:', linkError.message)
-      return byPhone as RestaurantDesktopProfile & { phone_verified?: boolean }
+      return byEmail as RestaurantDesktopProfile & { email_verified?: boolean }
     }
 
-    return { ...byPhone, id: authUserId } as RestaurantDesktopProfile & {
-      phone_verified?: boolean
+    return { ...byEmail, id: authUserId } as RestaurantDesktopProfile & {
+      email_verified?: boolean
     }
   }
 
-  return byPhone as RestaurantDesktopProfile & { phone_verified?: boolean }
+  return byEmail as RestaurantDesktopProfile & { email_verified?: boolean }
 }
 
 async function resolveAuthenticatedProfile(
   supabase: SupabaseClient,
   authUser: User,
-  expectedPhone: string,
-): Promise<(RestaurantDesktopProfile & { phone_verified?: boolean }) | null> {
-  if (!phonesMatch(authUser.phone, expectedPhone)) {
-    console.warn('[vendor-auth] auth phone mismatch', authUser.phone, expectedPhone)
+  expectedEmail: string,
+): Promise<(RestaurantDesktopProfile & { email_verified?: boolean }) | null> {
+  const authEmail = (authUser.email || '').trim().toLowerCase()
+  if (authEmail && !emailsMatch(authEmail, expectedEmail)) {
+    console.warn('[vendor-auth] auth email mismatch', authEmail, expectedEmail)
     return null
   }
 
-  return findProfileForAuthUser(supabase, authUser.id, expectedPhone)
+  return findProfileForAuthUser(supabase, authUser.id, expectedEmail)
 }
 
 function toProfile(
-  profile: RestaurantDesktopProfile & { phone_verified?: boolean },
+  profile: RestaurantDesktopProfile & { email_verified?: boolean },
 ): RestaurantDesktopProfile {
   return {
     id: profile.id,
@@ -120,23 +146,22 @@ function toProfile(
 
 export async function verifyRestaurantDesktopOtp(
   supabase: SupabaseClient,
-  phone: string,
+  email: string,
   otp: string,
-  email?: string,
 ): Promise<
   | { ok: true; profile: RestaurantDesktopProfile; isTestSession?: boolean }
   | { ok: false; message: string }
 > {
-  const formattedPhone = formatPhoneNumber(phone)
+  const normalizedEmail = email.trim().toLowerCase()
 
-  if (isTestPhoneNumber(formattedPhone)) {
-    return verifyTestRestaurantDesktopOtp(supabase, phone, otp, email)
+  if (isTestEmail(normalizedEmail)) {
+    return verifyTestRestaurantDesktopOtp(supabase, normalizedEmail, otp)
   }
 
   const { data, error } = await supabase.auth.verifyOtp({
-    phone: formattedPhone,
+    email: normalizedEmail,
     token: otp.trim(),
-    type: 'sms',
+    type: 'email',
   })
 
   if (error || !data.user) {
@@ -151,7 +176,7 @@ export async function verifyRestaurantDesktopOtp(
   const profile = await resolveAuthenticatedProfile(
     supabase,
     data.user,
-    formattedPhone,
+    normalizedEmail,
   )
 
   if (!profile) {
@@ -159,7 +184,11 @@ export async function verifyRestaurantDesktopOtp(
     return { ok: false, message: AUTH_ERRORS.noProfile }
   }
 
-  const subscription = await loadSubscriptionEntitlement(supabase, profile.id)
+  const subscription = await loadSubscriptionEntitlement(
+    supabase,
+    profile.id,
+    data.user.id,
+  )
   if (!canAccessRestaurantDesktop(profile, subscription)) {
     await supabase.auth.signOut({ scope: 'local' })
     return {
@@ -168,17 +197,17 @@ export async function verifyRestaurantDesktopOtp(
     }
   }
 
-  if (profile.phone_verified === false) {
+  if (profile.email_verified === false) {
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
-        phone_verified: true,
+        email_verified: true,
         updated_at: new Date().toISOString(),
       })
       .eq('id', profile.id)
 
     if (updateError) {
-      console.warn('[vendor-auth] phone_verified update skipped:', updateError.message)
+      console.warn('[vendor-auth] email_verified update skipped:', updateError.message)
     }
   }
 
@@ -189,21 +218,35 @@ export async function getRestaurantDesktopProfileForUser(
   supabase: SupabaseClient,
   user: User,
 ): Promise<RestaurantDesktopProfile | null> {
-  if (!user.phone) {
+  const email = (user.email || '').trim().toLowerCase()
+  if (!email && !user.id) {
     return null
   }
 
-  const profile = await findProfileForAuthUser(supabase, user.id, user.phone)
+  const profile = email
+    ? await findProfileForAuthUser(supabase, user.id, email)
+    : (
+        await supabase
+          .from('profiles')
+          .select(PROFILE_FIELDS)
+          .eq('id', user.id)
+          .maybeSingle()
+      ).data
 
-  if (!profile || !phonesMatch(profile.phone, user.phone)) {
+  if (!profile) {
     return null
   }
 
-  if (!canAccessRestaurantDesktop(profile, await loadSubscriptionEntitlement(supabase, profile.id))) {
+  const subscription = await loadSubscriptionEntitlement(
+    supabase,
+    profile.id,
+    user.id,
+  )
+  if (!canAccessRestaurantDesktop(profile, subscription)) {
     return null
   }
 
-  return toProfile(profile)
+  return toProfile(profile as RestaurantDesktopProfile & { email_verified?: boolean })
 }
 
 export async function getAuthenticatedRestaurantDesktopProfile(
@@ -214,7 +257,7 @@ export async function getAuthenticatedRestaurantDesktopProfile(
     error: userError,
   } = await supabase.auth.getUser()
 
-  if (userError || !user?.phone) {
+  if (userError || !user) {
     return null
   }
 

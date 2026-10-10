@@ -151,23 +151,14 @@ export function SettingsPage() {
             <div>
               <h3 className="font-semibold">About</h3>
               <p className="text-sm text-muted-foreground">{APP_CONFIG.name}</p>
+              <p className="text-sm text-muted-foreground">Version: {appVersion}</p>
+              <p className="text-sm text-muted-foreground text-italic">By Foodma Technologies</p>
             </div>
           </div>
 
-          <div className="space-y-2 text-sm">
-            <p>
-              <span className="text-muted-foreground">Version: </span>
-              {appVersion}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Stack: </span>
-              Electron + React + Vite + SQLite
-            </p>
-          </div>
+         
 
-          <Button variant="outline" size="sm" className="mt-4" disabled>
-            Check for updates
-          </Button>
+         
         </Card>
       </div>
     </div>

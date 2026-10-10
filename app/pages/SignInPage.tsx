@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KeyRound, Mail, MessageCircle } from 'lucide-react'
+import { KeyRound, Mail } from 'lucide-react'
 
+import brandLogo from '@/resources/icons/logo.png'
 import { useAuthStore } from '@/app/stores/authStore'
 import { Button } from '@/app/components/ui/button'
 import {
@@ -10,9 +11,8 @@ import {
   MAX_OTP_ATTEMPTS,
   OTP_RESEND_SECONDS,
 } from '@/lib/auth/auth-security'
-import { isValidSignInEmail } from '@/lib/auth/email-sign-in'
-import { maskPhoneNumber } from '@/lib/auth/phone'
-import { isTestPhoneNumber, TEST_OTP } from '@/lib/auth/test-auth'
+import { isValidSignInEmail, maskEmailAddress } from '@/lib/auth/email-sign-in'
+import { isTestEmail, TEST_OTP } from '@/lib/auth/test-auth'
 
 type Mode = 'owner' | 'staff'
 type Step = 'email' | 'otp'
@@ -22,8 +22,8 @@ export function SignInPage() {
   const status = useAuthStore((s) => s.status)
   const initialized = useAuthStore((s) => s.initialized)
   const error = useAuthStore((s) => s.error)
-  const pendingPhone = useAuthStore((s) => s.pendingPhone)
-  const maskedPhone = useAuthStore((s) => s.maskedPhone)
+  const pendingEmail = useAuthStore((s) => s.pendingEmail)
+  const maskedEmail = useAuthStore((s) => s.maskedEmail)
   const initialize = useAuthStore((s) => s.initialize)
   const sendOtp = useAuthStore((s) => s.sendOtp)
   const verifyOtp = useAuthStore((s) => s.verifyOtp)
@@ -65,14 +65,16 @@ export function SignInPage() {
     }
 
     setLoading(true)
-    const ok = await sendOtp(normalizedEmail)
-    setLoading(false)
-
-    if (ok) {
-      setStep('otp')
-      setOtp('')
-      setOtpAttempts(0)
-      setResendTimer(OTP_RESEND_SECONDS)
+    try {
+      const ok = await sendOtp(normalizedEmail)
+      if (ok) {
+        setStep('otp')
+        setOtp('')
+        setOtpAttempts(0)
+        setResendTimer(OTP_RESEND_SECONDS)
+      }
+    } finally {
+      setLoading(false)
     }
   }, [email, sendOtp])
 
@@ -89,13 +91,15 @@ export function SignInPage() {
 
     setOtpAttempts((attempts) => attempts + 1)
     setLoading(true)
-    const ok = await verifyOtp(otp.trim())
-    setLoading(false)
-
-    if (ok) {
-      navigate('/', { replace: true })
-    } else {
-      setOtp('')
+    try {
+      const ok = await verifyOtp(otp.trim())
+      if (ok) {
+        navigate('/', { replace: true })
+      } else {
+        setOtp('')
+      }
+    } finally {
+      setLoading(false)
     }
   }, [otp, otpAttempts, verifyOtp, navigate])
 
@@ -111,10 +115,13 @@ export function SignInPage() {
     }
 
     setLoading(true)
-    const ok = await signInStaff(normalizedEmail, accessCode.trim())
-    setLoading(false)
-    if (ok) {
-      navigate('/', { replace: true })
+    try {
+      const ok = await signInStaff(normalizedEmail, accessCode.trim())
+      if (ok) {
+        navigate('/', { replace: true })
+      }
+    } finally {
+      setLoading(false)
     }
   }, [email, accessCode, signInStaff, navigate])
 
@@ -143,12 +150,14 @@ export function SignInPage() {
     <div className="flex h-full min-h-0 items-center justify-center bg-background px-4 py-8">
       <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-xl">
         <div className="mb-6 text-center">
-          <h1 className="mt-2 text-2xl font-semibold text-foreground">
+          <img
+            src={brandLogo}
+            alt="Foodpos"
+            className="mx-auto h-12 w-12 rounded-2xl object-contain"
+          />
+          <h1 className="mt-3 text-2xl font-semibold text-foreground">
             Sign in to your restaurant
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Owners use email + WhatsApp OTP. Staff use email + access code.
-          </p>
         </div>
 
         <div className="mb-6 inline-flex w-full rounded-full bg-muted p-1">
@@ -306,7 +315,7 @@ export function SignInPage() {
               disabled={loading || !email.trim()}
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-6 text-sm font-semibold uppercase tracking-[0.2em] text-primary-foreground hover:bg-primary-dark"
             >
-              <MessageCircle className="h-4 w-4" />
+              <Mail className="h-4 w-4" />
               {loading ? 'Sending code…' : 'Continue'}
             </Button>
           </form>
@@ -319,11 +328,11 @@ export function SignInPage() {
             className="space-y-5"
           >
             <div className="rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
-              Code sent to WhatsApp{' '}
+              Code sent to{' '}
               <span className="font-semibold">
-                {maskedPhone || maskPhoneNumber(pendingPhone)}
+                {maskedEmail || maskEmailAddress(pendingEmail)}
               </span>
-              {isTestPhoneNumber(pendingPhone) && (
+              {isTestEmail(pendingEmail) && (
                 <p className="mt-2 text-xs text-success/90">
                   Review account: use verification code{' '}
                   <span className="font-mono font-semibold">{TEST_OTP}</span>

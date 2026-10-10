@@ -17,3 +17,20 @@ export interface Setting {
   value: string
   updated_at: string
 }
+
+/** Local parked checkout cart — not a cloud `orders` row. */
+export interface HeldCartRecord extends BaseEntity {
+  vendor_id: string
+  label: string | null
+  payload: string
+  total: number
+  item_count: number
+}
+
+export type CreateHeldCartInput = {
+  vendor_id: string
+  label?: string | null
+  payload: string
+  total: number
+  item_count: number
+}

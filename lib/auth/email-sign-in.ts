@@ -2,10 +2,9 @@ import {
   createPublicSupabaseClient,
   getSupabaseAnonKey,
 } from '@/lib/supabase/client'
-import { maskPhoneNumber } from '@/lib/auth/phone'
 
 export type EmailSignInResult =
-  | { ok: true; phone: string; maskedPhone: string }
+  | { ok: true; email: string; maskedEmail: string }
   | {
       ok: false
       code?: 'not_registered' | 'no_phone' | 'invalid_email' | 'send_failed'
@@ -16,6 +15,9 @@ type EmailSignInCode = NonNullable<Extract<EmailSignInResult, { ok: false }>['co
 
 type EmailSignInResponse = {
   success: boolean
+  email?: string
+  masked_email?: string
+  /** Compat from edge during migration */
   masked_phone?: string
   phone?: string
   error?: string
@@ -33,6 +35,14 @@ const REACHABILITY_ERROR = 'Could not reach sign-in service'
 
 export function isValidSignInEmail(email: string): boolean {
   return EMAIL_PATTERN.test(email.trim())
+}
+
+export function maskEmailAddress(email: string): string {
+  const trimmed = email.trim().toLowerCase()
+  const [local, domain] = trimmed.split('@')
+  if (!local || !domain) return '***'
+  const visible = local.slice(0, Math.min(2, local.length))
+  return `${visible}***@${domain}`
 }
 
 function isFunctionPayload(value: unknown): value is EmailSignInResponse {
@@ -91,7 +101,7 @@ function messageForFunctionError(payload: EmailSignInResponse): string {
 export async function requestEmailSignInOtp(
   email: string,
 ): Promise<EmailSignInResult> {
-  const trimmed = email.trim()
+  const trimmed = email.trim().toLowerCase()
   if (!trimmed) {
     return { ok: false, code: 'invalid_email', message: 'Email is required' }
   }
@@ -122,11 +132,17 @@ export async function requestEmailSignInOtp(
       (isFunctionPayload(data) ? data : null) ||
       (isFunctionPayload(parsedErrorBody) ? parsedErrorBody : null)
 
-    if (payload?.success && payload.phone) {
+    if (payload?.success) {
+      const resolvedEmail = (payload.email || payload.phone || trimmed)
+        .trim()
+        .toLowerCase()
       return {
         ok: true,
-        phone: payload.phone,
-        maskedPhone: payload.masked_phone || maskPhoneNumber(payload.phone),
+        email: resolvedEmail,
+        maskedEmail:
+          payload.masked_email ||
+          payload.masked_phone ||
+          maskEmailAddress(resolvedEmail),
       }
     }
 

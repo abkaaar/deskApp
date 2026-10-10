@@ -69,5 +69,10 @@ export function isPosOrder(order: Order): boolean {
 }
 
 export function isHeldPosOrder(order: Order): boolean {
-  return parsePosNotes(order.notes)?.held === true
+  if (parsePosNotes(order.notes)?.held === true) return true
+  const meta =
+    order.pos_meta && typeof order.pos_meta === 'object'
+      ? (order.pos_meta as Record<string, unknown>)
+      : null
+  return meta?.held === true
 }

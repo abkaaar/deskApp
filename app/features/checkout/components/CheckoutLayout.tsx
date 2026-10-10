@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useAuthStore } from '@/app/stores/authStore'
 import { formatCurrency } from '@/lib/checkout/format'
-import { createPosOrderFromCart } from '@/lib/checkout/posCheckoutService'
+import { holdCurrentSale } from '@/lib/checkout/holdSale'
 import { cn } from '@/lib/utils'
 
 import { useCheckoutStore, type CheckoutMode } from '../checkoutStore'
@@ -37,16 +37,14 @@ export function CheckoutLayout() {
   const getItemCount = useCheckoutStore((s) => s.getItemCount)
   const getTotal = useCheckoutStore((s) => s.getTotal)
   const dineInReady = useCheckoutStore((s) => s.dineInReady)
-  const beginSaleSubmit = useCheckoutStore((s) => s.beginSaleSubmit)
-  const finishSaleSubmit = useCheckoutStore((s) => s.finishSaleSubmit)
   const isSubmitting = useCheckoutStore((s) => s.isSubmitting)
 
   const [reviewOpen, setReviewOpen] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
+  const [holding, setHolding] = useState(false)
   const [split, setSplit] = useState(
     typeof window !== 'undefined' ? window.innerWidth >= SPLIT_MIN : true,
   )
-  const holdInFlight = useRef(false)
 
   useEffect(() => {
     if (profile?.id) hydrateFavorites(profile.id)
@@ -69,48 +67,24 @@ export function CheckoutLayout() {
   }
 
   const handleHold = async () => {
-    if (!profile?.id || cart.length === 0 || holdInFlight.current || isSubmitting) return
+    if (!profile?.id || cart.length === 0 || holding || isSubmitting) return
     if (!dineInReady()) {
       toast.error('Select a table for dine-in orders')
       return
     }
-    const snapshot = beginSaleSubmit()
-    if (!snapshot) {
-      toast.error('Unable to hold order')
-      return
-    }
-    holdInFlight.current = true
+    setHolding(true)
     try {
-      const result = await createPosOrderFromCart({
-        vendorId: profile.id,
-        buyerId: profile.id,
-        orderType: snapshot.orderType,
-        paymentMethod: 'cash',
-        lineItems: snapshot.lineItems,
-        subtotal: snapshot.subtotal,
-        total: snapshot.total,
-        totalQuantity: snapshot.itemCount,
-        customerName: snapshot.customerName,
-        customerId: snapshot.customerId,
-        tableId: snapshot.tableId,
-        discount: snapshot.discount,
-        hold: true,
-      })
-      if (!result.success || !result.orderId) {
-        finishSaleSubmit()
-        toast.error(result.error || 'Could not hold order')
+      const result = await holdCurrentSale(profile.id)
+      if (!result.ok) {
+        toast.error(result.error)
         return
       }
       setReviewOpen(false)
-      resetSale()
-      toast.success('Order held', {
-        description: `Saved (#${result.orderId.slice(0, 8)})`,
+      toast.success('Cart held', {
+        description: 'No order created — resume from Held when ready to pay.',
       })
-    } catch {
-      finishSaleSubmit()
-      toast.error('Could not hold order')
     } finally {
-      holdInFlight.current = false
+      setHolding(false)
     }
   }
 
@@ -210,7 +184,7 @@ export function CheckoutLayout() {
         onClose={() => setReviewOpen(false)}
         onEdit={() => setReviewOpen(false)}
         onHold={() => void handleHold()}
-        holding={holdInFlight.current}
+        holding={holding || isSubmitting}
         onPay={() => {
           setReviewOpen(false)
           setPayOpen(true)

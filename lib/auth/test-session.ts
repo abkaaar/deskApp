@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   canAccessRestaurantDesktop,
 } from '@/lib/auth/desktop-access'
-import { findProfileByPhone } from '@/lib/auth/profile-lookup'
+import { findProfileByEmail, findProfileByPhone } from '@/lib/auth/profile-lookup'
 import { DESKTOP_TEST_SESSION_KEY } from '@/lib/auth/test-auth'
 import type { RestaurantDesktopProfile } from '@/lib/auth/vendor-auth'
 
@@ -45,8 +45,12 @@ export async function loadPersistedTestSession(
       return null
     }
 
-    if (supabase && cached.phone) {
-      const fresh = await findProfileByPhone(supabase, cached.phone)
+    if (supabase) {
+      const fresh = cached.email
+        ? await findProfileByEmail(supabase, cached.email)
+        : cached.phone
+          ? await findProfileByPhone(supabase, cached.phone)
+          : null
       if (fresh) {
         const subscription = await loadSubscription(supabase, fresh.id)
         if (canAccessRestaurantDesktop(fresh, subscription)) {
@@ -56,9 +60,7 @@ export async function loadPersistedTestSession(
         await clearTestSession()
         return null
       }
-    }
 
-    if (supabase) {
       const subscription = await loadSubscription(supabase, cached.id)
       if (!canAccessRestaurantDesktop(cached, subscription)) {
         await clearTestSession()

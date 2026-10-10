@@ -5,47 +5,42 @@ import {
   canAccessRestaurantDesktop,
   getDesktopAccessDenialMessage,
 } from '@/lib/auth/desktop-access'
-import { findProfileByPhoneOrEmail } from '@/lib/auth/profile-lookup'
-import { formatPhoneNumber } from '@/lib/auth/phone'
+import { findProfileByEmail } from '@/lib/auth/profile-lookup'
 import {
   getExpectedTestOtp,
-  isTestPhoneNumber,
+  isTestEmail,
+  TEST_EMAIL,
 } from '@/lib/auth/test-auth'
 import type { RestaurantDesktopProfile } from '@/lib/auth/vendor-auth'
 
 /**
- * Verify OTP for test phone numbers without Supabase Auth session.
+ * Verify OTP for the App Reviewer test email without Supabase Auth session.
  * Mirrors mobile useAuthStore test bypass (client-side OTP + DB profile load).
  */
 export async function verifyTestRestaurantDesktopOtp(
   supabase: SupabaseClient,
-  phone: string,
+  email: string,
   otp: string,
-  email?: string,
 ): Promise<
   | { ok: true; profile: RestaurantDesktopProfile; isTestSession: true }
   | { ok: false; message: string }
 > {
-  const formattedPhone = formatPhoneNumber(phone)
+  const normalizedEmail = email.trim().toLowerCase()
 
-  if (!isTestPhoneNumber(formattedPhone)) {
+  if (!isTestEmail(normalizedEmail)) {
     return { ok: false, message: AUTH_ERRORS.verifyFailed }
   }
 
-  if (otp.trim() !== getExpectedTestOtp(formattedPhone)) {
+  if (otp.trim() !== getExpectedTestOtp(normalizedEmail)) {
     return { ok: false, message: AUTH_ERRORS.verifyFailed }
   }
 
   console.log('[test-auth] Test OTP accepted — loading profile from database')
 
-  const profile = await findProfileByPhoneOrEmail(
-    supabase,
-    formattedPhone,
-    email,
-  )
+  const profile = await findProfileByEmail(supabase, normalizedEmail)
 
   if (!profile) {
-    console.warn('[test-auth] No profile found for test phone/email')
+    console.warn('[test-auth] No profile found for test email')
     return { ok: false, message: AUTH_ERRORS.noProfile }
   }
 
@@ -60,7 +55,7 @@ export async function verifyTestRestaurantDesktopOtp(
   if ((profile.vendor_type || '').toLowerCase() !== 'restaurant') {
     patch.vendor_type = 'restaurant'
   }
-  if (!profile.email) patch.email = 'appreviewer@foodma.co'
+  if (!profile.email) patch.email = TEST_EMAIL
   if (!profile.business_name) patch.business_name = 'Foodma Demo Restaurant'
   if (Object.keys(patch).length > 1) {
     await supabase.from('profiles').update(patch).eq('id', profile.id)

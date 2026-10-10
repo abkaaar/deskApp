@@ -35,8 +35,7 @@ type AuthState = {
   isTestSession: boolean
   error: string | null
   pendingEmail: string
-  pendingPhone: string
-  maskedPhone: string
+  maskedEmail: string
   initialized: boolean
   initialize: () => Promise<void>
   sendOtp: (email: string) => Promise<boolean>
@@ -48,7 +47,24 @@ type AuthState = {
   hasPermission: (permission: VendorStaffPermission) => boolean
 }
 
+const INIT_TIMEOUT_MS = 12_000
+
 let authSubscription: { unsubscribe: () => void } | null = null
+let initializePromise: Promise<void> | null = null
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
 
 async function persistUxMetadata(profile: RestaurantDesktopProfile): Promise<void> {
   await window.api.settings.set('last_vendor_id', profile.id)
@@ -79,8 +95,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isTestSession: false,
   error: null,
   pendingEmail: '',
-  pendingPhone: '',
-  maskedPhone: '',
+  maskedEmail: '',
   initialized: false,
 
   hasPermission: (permission) => {
@@ -92,85 +107,153 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   initialize: async () => {
     if (get().initialized) return
+    if (initializePromise) return initializePromise
 
-    try {
-      const supabase = getSupabaseClient()
+    initializePromise = (async () => {
+      try {
+        const supabase = getSupabaseClient()
 
-      const staffSession = await loadPersistedStaffSession()
-      if (staffSession) {
-        await applyStaffAccessToken(staffSession.accessToken)
-        await persistUxMetadata(staffSession.vendor)
-        set({
-          status: 'authenticated',
-          profile: staffSession.vendor,
-          actor: 'staff',
-          staff: staffSession.staff,
-          permissions: staffSession.staff.permissions,
-          isTestSession: false,
-          error: null,
-          initialized: true,
-        })
-        return
-      }
+        const staffSession = await withTimeout(
+          loadPersistedStaffSession(),
+          INIT_TIMEOUT_MS,
+          'staff session restore',
+        )
+        if (staffSession) {
+          await applyStaffAccessToken(staffSession.accessToken)
+          await persistUxMetadata(staffSession.vendor)
+          set({
+            status: 'authenticated',
+            profile: staffSession.vendor,
+            actor: 'staff',
+            staff: staffSession.staff,
+            permissions: staffSession.staff.permissions,
+            isTestSession: false,
+            error: null,
+            initialized: true,
+          })
+          return
+        }
 
-      const testProfile = await loadPersistedTestSession(supabase)
-      if (testProfile) {
-        await persistUxMetadata(testProfile)
-        set({
-          status: 'authenticated',
-          profile: testProfile,
-          actor: 'owner',
-          staff: null,
-          permissions: null,
-          isTestSession: true,
-          error: null,
-          initialized: true,
-        })
-        return
-      }
+        const testProfile = await withTimeout(
+          loadPersistedTestSession(supabase),
+          INIT_TIMEOUT_MS,
+          'test session restore',
+        )
+        if (testProfile) {
+          await persistUxMetadata(testProfile)
+          set({
+            status: 'authenticated',
+            profile: testProfile,
+            actor: 'owner',
+            staff: null,
+            permissions: null,
+            isTestSession: true,
+            error: null,
+            initialized: true,
+          })
+          return
+        }
 
-      if (!authSubscription) {
-        const { data } = supabase.auth.onAuthStateChange(async (event) => {
-          if (get().actor === 'staff') return
+        if (!authSubscription) {
+          const { data } = supabase.auth.onAuthStateChange(async (event) => {
+            if (get().actor === 'staff') return
 
-          if (event === 'SIGNED_OUT') {
-            set({
-              status: 'unauthenticated',
-              profile: null,
-              actor: 'owner',
-              staff: null,
-              permissions: null,
-              isTestSession: false,
-              error: null,
-            })
-            return
-          }
-
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            const profile = await getAuthenticatedRestaurantDesktopProfile(supabase)
-            if (profile) {
-              await clearTestSession()
-              await persistUxMetadata(profile)
+            if (event === 'SIGNED_OUT') {
               set({
-                status: 'authenticated',
-                profile,
+                status: 'unauthenticated',
+                profile: null,
                 actor: 'owner',
                 staff: null,
                 permissions: null,
                 isTestSession: false,
                 error: null,
               })
+              return
             }
-          }
+
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              const profile = await getAuthenticatedRestaurantDesktopProfile(supabase)
+              if (profile) {
+                await clearTestSession()
+                await persistUxMetadata(profile)
+                set({
+                  status: 'authenticated',
+                  profile,
+                  actor: 'owner',
+                  staff: null,
+                  permissions: null,
+                  isTestSession: false,
+                  error: null,
+                  initialized: true,
+                })
+              } else if (event === 'SIGNED_IN') {
+                set({
+                  status: 'unauthenticated',
+                  profile: null,
+                  actor: 'owner',
+                  staff: null,
+                  permissions: null,
+                  isTestSession: false,
+                  error: AUTH_ERRORS.noDesktopAccess,
+                  initialized: true,
+                })
+              }
+            }
+          })
+          authSubscription = data.subscription
+        }
+
+        const {
+          data: { session },
+        } = await withTimeout(supabase.auth.getSession(), INIT_TIMEOUT_MS, 'getSession')
+
+        if (!session?.user) {
+          set({
+            status: 'unauthenticated',
+            profile: null,
+            actor: 'owner',
+            staff: null,
+            permissions: null,
+            isTestSession: false,
+            initialized: true,
+          })
+          return
+        }
+
+        const profile = await withTimeout(
+          getAuthenticatedRestaurantDesktopProfile(supabase),
+          INIT_TIMEOUT_MS,
+          'profile restore',
+        )
+        if (!profile) {
+          await supabase.auth.signOut({ scope: 'local' })
+          await window.api.auth.clearAll()
+          set({
+            status: 'unauthenticated',
+            profile: null,
+            actor: 'owner',
+            staff: null,
+            permissions: null,
+            isTestSession: false,
+            error: AUTH_ERRORS.noDesktopAccess,
+            initialized: true,
+          })
+          return
+        }
+
+        await persistUxMetadata(profile)
+        set({
+          status: 'authenticated',
+          profile,
+          actor: 'owner',
+          staff: null,
+          permissions: null,
+          isTestSession: false,
+          error: null,
+          initialized: true,
         })
-        authSubscription = data.subscription
-      }
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      if (!session?.user) {
+      } catch (error) {
+        console.error('[authStore] initialize failed:', error)
         set({
           status: 'unauthenticated',
           profile: null,
@@ -178,52 +261,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           staff: null,
           permissions: null,
           isTestSession: false,
+          error: 'Could not restore your session. Please sign in again.',
           initialized: true,
         })
-        return
+      } finally {
+        initializePromise = null
       }
+    })()
 
-      const profile = await getAuthenticatedRestaurantDesktopProfile(supabase)
-      if (!profile) {
-        await supabase.auth.signOut({ scope: 'local' })
-        await window.api.auth.clearAll()
-        set({
-          status: 'unauthenticated',
-          profile: null,
-          actor: 'owner',
-          staff: null,
-          permissions: null,
-          isTestSession: false,
-          error: AUTH_ERRORS.noDesktopAccess,
-          initialized: true,
-        })
-        return
-      }
-
-      await persistUxMetadata(profile)
-      set({
-        status: 'authenticated',
-        profile,
-        actor: 'owner',
-        staff: null,
-        permissions: null,
-        isTestSession: false,
-        error: null,
-        initialized: true,
-      })
-    } catch (error) {
-      console.error('[authStore] initialize failed:', error)
-      set({
-        status: 'unauthenticated',
-        profile: null,
-        actor: 'owner',
-        staff: null,
-        permissions: null,
-        isTestSession: false,
-        error: 'Could not restore your session. Please sign in again.',
-        initialized: true,
-      })
-    }
+    return initializePromise
   },
 
   sendOtp: async (email: string) => {
@@ -240,86 +286,102 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     set({
-      pendingEmail: email.trim().toLowerCase(),
-      pendingPhone: result.phone,
-      maskedPhone: result.maskedPhone,
+      pendingEmail: result.email,
+      maskedEmail: result.maskedEmail,
       error: null,
     })
     return true
   },
 
   verifyOtp: async (otp: string) => {
-    const { pendingPhone, pendingEmail } = get()
-    if (!pendingPhone) {
+    const { pendingEmail } = get()
+    if (!pendingEmail) {
       set({ error: AUTH_ERRORS.sessionExpired })
       return false
     }
 
     set({ error: null })
-    const supabase = getSupabaseClient()
-    const result = await verifyRestaurantDesktopOtp(
-      supabase,
-      pendingPhone,
-      otp,
-      pendingEmail,
-    )
+    try {
+      const supabase = getSupabaseClient()
+      const result = await verifyRestaurantDesktopOtp(
+        supabase,
+        pendingEmail,
+        otp,
+      )
 
-    if (!result.ok) {
-      set({ error: result.message })
+      if (!result.ok) {
+        set({ error: result.message, initialized: true })
+        return false
+      }
+
+      const isTestSession = result.isTestSession === true
+      await clearPersistedStaffSession()
+
+      if (isTestSession) {
+        await persistTestSession(result.profile)
+      } else {
+        await clearTestSession()
+      }
+
+      await persistUxMetadata(result.profile)
+      set({
+        status: 'authenticated',
+        profile: result.profile,
+        actor: 'owner',
+        staff: null,
+        permissions: null,
+        isTestSession,
+        error: null,
+        pendingEmail: '',
+        maskedEmail: '',
+        initialized: true,
+      })
+      return true
+    } catch (error) {
+      console.error('[authStore] verifyOtp failed:', error)
+      set({
+        error: AUTH_ERRORS.verifyFailed,
+        initialized: true,
+      })
       return false
     }
-
-    const isTestSession = result.isTestSession === true
-    await clearPersistedStaffSession()
-
-    if (isTestSession) {
-      await persistTestSession(result.profile)
-    } else {
-      await clearTestSession()
-    }
-
-    await persistUxMetadata(result.profile)
-    set({
-      status: 'authenticated',
-      profile: result.profile,
-      actor: 'owner',
-      staff: null,
-      permissions: null,
-      isTestSession,
-      error: null,
-      pendingEmail: '',
-      pendingPhone: '',
-      maskedPhone: '',
-    })
-    return true
   },
 
   signInStaff: async (email: string, code: string) => {
     set({ error: null })
-    const result = await requestStaffSignIn(email, code)
-    if (!result.ok) {
-      set({ error: result.message })
+    try {
+      const result = await requestStaffSignIn(email, code)
+      if (!result.ok) {
+        set({ error: result.message, initialized: true })
+        return false
+      }
+
+      await clearTestSession()
+      await applyStaffAccessToken(result.session.accessToken)
+      await persistStaffSession(result.session)
+      await persistUxMetadata(result.session.vendor)
+
+      set({
+        status: 'authenticated',
+        profile: result.session.vendor,
+        actor: 'staff',
+        staff: result.session.staff,
+        permissions: result.session.staff.permissions,
+        isTestSession: false,
+        error: null,
+        pendingEmail: '',
+        maskedEmail: '',
+        initialized: true,
+      })
+      return true
+    } catch (error) {
+      console.error('[authStore] signInStaff failed:', error)
+      set({
+        error: 'Staff sign-in failed. Please try again.',
+        initialized: true,
+      })
       return false
     }
-
-    await clearTestSession()
-    await applyStaffAccessToken(result.session.accessToken)
-    await persistStaffSession(result.session)
-    await persistUxMetadata(result.session.vendor)
-
-    set({
-      status: 'authenticated',
-      profile: result.session.vendor,
-      actor: 'staff',
-      staff: result.session.staff,
-      permissions: result.session.staff.permissions,
-      isTestSession: false,
-      error: null,
-      pendingEmail: '',
-      pendingPhone: '',
-      maskedPhone: '',
-    })
-    return true
   },
 
   signOut: async () => {
@@ -346,8 +408,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isTestSession: false,
       error: null,
       pendingEmail: '',
-      pendingPhone: '',
-      maskedPhone: '',
+      maskedEmail: '',
+      initialized: true,
     })
   },
 
@@ -356,8 +418,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   resetPending: () =>
     set({
       pendingEmail: '',
-      pendingPhone: '',
-      maskedPhone: '',
+      maskedEmail: '',
       error: null,
     }),
 }))

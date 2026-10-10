@@ -4,18 +4,25 @@ import { toast } from 'sonner'
 
 import { useAuthStore } from '@/app/stores/authStore'
 import { formatCurrency } from '@/lib/checkout/format'
-import { isHeldPosOrder, parsePosNotes } from '@/lib/checkout/pos-order'
-import { getSupabaseClient } from '@/lib/supabase/client'
-import type { Order } from '@/lib/types/order'
+import {
+  deleteHeldCart,
+  HOLDS_CHANGED_EVENT,
+  listHeldCarts,
+  type HeldCartView,
+} from '@/lib/checkout/heldCarts'
 import { cn } from '@/lib/utils'
 
+import { useCheckoutStore } from '../checkoutStore'
+
 type HeldOrdersPanelProps = {
-  onResumePaid?: () => void
+  onResumed?: () => void
 }
 
-export function HeldOrdersPanel({ onResumePaid }: HeldOrdersPanelProps) {
+export function HeldOrdersPanel({ onResumed }: HeldOrdersPanelProps) {
   const profile = useAuthStore((s) => s.profile)
-  const [holds, setHolds] = useState<Order[]>([])
+  const cart = useCheckoutStore((s) => s.cart)
+  const restoreHeldSale = useCheckoutStore((s) => s.restoreHeldSale)
+  const [holds, setHolds] = useState<HeldCartView[]>([])
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -28,17 +35,7 @@ export function HeldOrdersPanel({ onResumePaid }: HeldOrdersPanelProps) {
     }
     setLoading(true)
     try {
-      const supabase = getSupabaseClient()
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('vendor_id', profile.id)
-        .eq('payment_status', 'pending')
-        .eq('source', 'pos')
-        .order('created_at', { ascending: false })
-        .limit(30)
-      if (error) throw error
-      setHolds((data as Order[]).filter(isHeldPosOrder))
+      setHolds(await listHeldCarts(profile.id))
     } catch {
       setHolds([])
     } finally {
@@ -48,6 +45,14 @@ export function HeldOrdersPanel({ onResumePaid }: HeldOrdersPanelProps) {
 
   useEffect(() => {
     void load()
+  }, [load])
+
+  useEffect(() => {
+    const onChange = () => {
+      void load()
+    }
+    window.addEventListener(HOLDS_CHANGED_EVENT, onChange)
+    return () => window.removeEventListener(HOLDS_CHANGED_EVENT, onChange)
   }, [load])
 
   useEffect(() => {
@@ -69,71 +74,35 @@ export function HeldOrdersPanel({ onResumePaid }: HeldOrdersPanelProps) {
     }
   }, [open, load])
 
-  const settle = async (order: Order, method: 'cash' | 'card' | 'transfer' | 'wallet') => {
+  const resume = async (hold: HeldCartView) => {
     if (!profile?.id || busyId) return
-    setBusyId(order.id)
+    if (cart.length > 0) {
+      toast.error('Clear or hold the current cart before resuming')
+      return
+    }
+    setBusyId(hold.id)
     try {
-      const supabase = getSupabaseClient()
-      const meta = parsePosNotes(order.notes)
-      const now = new Date().toISOString()
-      const orderType = meta?.orderType ?? 'takeaway'
-      // Prefer kitchen_status when present; otherwise infer from notes / custom-only meta.
-      const posMeta =
-        order.pos_meta && typeof order.pos_meta === 'object'
-          ? (order.pos_meta as Record<string, unknown>)
-          : {}
-      let needsKitchen = false
-      if (typeof posMeta.needs_kitchen === 'boolean') {
-        needsKitchen = posMeta.needs_kitchen
-      } else if (Array.isArray(posMeta.lines)) {
-        needsKitchen = (posMeta.lines as { fulfilment_mode?: string }[]).some(
-          (l) => l.fulfilment_mode === 'made_to_order',
-        )
-      } else {
-        const customOnly =
-          Boolean(posMeta.custom_amounts) &&
-          !order.post_id &&
-          (!order.line_items || order.line_items.length === 0)
-        needsKitchen = !customOnly && Boolean(order.post_id)
-      }
-      const kitchenStatus = needsKitchen ? 'preparing' : 'completed'
-      const status =
-        kitchenStatus === 'completed'
-          ? 'delivered'
-          : orderType === 'delivery'
-            ? 'confirmed'
-            : 'preparing'
-      const { error } = await supabase
-        .from('orders')
-        .update({
-          payment_status: 'paid',
-          status,
-          kitchen_status: kitchenStatus,
-          paid_at: now,
-          confirmed_at: now,
-          delivered_at: status === 'delivered' ? now : null,
-          notes: JSON.stringify({
-            ...(meta ?? { type: 'pos', orderType: 'takeaway', paymentMethod: method }),
-            paymentMethod: method,
-            held: false,
-          }),
-          pos_meta: {
-            ...posMeta,
-            payment_method: method,
-            held: false,
-            order_type: orderType,
-          },
-        })
-        .eq('id', order.id)
-        .eq('vendor_id', profile.id)
-
-      if (error) {
-        toast.error(error.message || 'Could not settle hold')
+      const ok = restoreHeldSale(hold.payload)
+      if (!ok) {
+        toast.error('Could not restore held cart')
         return
       }
+      await deleteHeldCart(hold.id, profile.id)
+      toast.success('Held cart resumed')
+      setOpen(false)
+      onResumed?.()
+      await load()
+    } finally {
+      setBusyId(null)
+    }
+  }
 
-      toast.success('Held order paid')
-      onResumePaid?.()
+  const discard = async (hold: HeldCartView) => {
+    if (!profile?.id || busyId) return
+    setBusyId(hold.id)
+    try {
+      await deleteHeldCart(hold.id, profile.id)
+      toast.success('Held cart discarded')
       await load()
     } finally {
       setBusyId(null)
@@ -151,7 +120,7 @@ export function HeldOrdersPanel({ onResumePaid }: HeldOrdersPanelProps) {
         )}
       >
         <ClipboardList className="h-4 w-4" />
-        Held orders
+        Held
         {holds.length > 0 && (
           <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
             {holds.length}
@@ -162,7 +131,7 @@ export function HeldOrdersPanel({ onResumePaid }: HeldOrdersPanelProps) {
       {open && (
         <div className="absolute right-0 top-full z-40 mt-2 w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-border bg-card p-3 shadow-lg">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-semibold">Held orders</p>
+            <p className="text-sm font-semibold">Held carts</p>
             <button
               type="button"
               onClick={() => void load()}
@@ -171,38 +140,51 @@ export function HeldOrdersPanel({ onResumePaid }: HeldOrdersPanelProps) {
               Refresh
             </button>
           </div>
+          <p className="mb-2 text-[11px] text-muted-foreground">
+            Holds park the cart locally. No order is created until you pay.
+          </p>
           {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
           {!loading && holds.length === 0 && (
-            <p className="py-4 text-center text-xs text-muted-foreground">No held orders</p>
+            <p className="py-4 text-center text-xs text-muted-foreground">No held carts</p>
           )}
           <ul className="max-h-64 space-y-2 overflow-y-auto">
-            {holds.map((order) => (
+            {holds.map((hold) => (
               <li
-                key={order.id}
+                key={hold.id}
                 className="rounded-xl border border-border bg-muted/40 px-3 py-2"
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-xs font-medium">#{order.id.slice(0, 8)}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-muted-foreground">
+                      {hold.label || `#${hold.id.slice(0, 8)}`}
+                    </p>
                     <p className="text-sm font-semibold">
-                      {formatCurrency(Number(order.total) || 0)}
+                      {formatCurrency(hold.total)} · {hold.itemCount} items
                     </p>
                   </div>
-                  <div className="flex flex-wrap justify-end gap-1">
-                    {(['cash', 'card', 'transfer', 'wallet'] as const).map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        disabled={busyId === order.id}
-                        onClick={() => void settle(order, m)}
-                        className={cn(
-                          'rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase text-primary-foreground',
-                          busyId === order.id && 'opacity-50',
-                        )}
-                      >
-                        {m}
-                      </button>
-                    ))}
+                  <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                    <button
+                      type="button"
+                      disabled={busyId === hold.id}
+                      onClick={() => void resume(hold)}
+                      className={cn(
+                        'rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase text-primary-foreground',
+                        busyId === hold.id && 'opacity-50',
+                      )}
+                    >
+                      Resume
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === hold.id}
+                      onClick={() => void discard(hold)}
+                      className={cn(
+                        'rounded-full border border-border px-2.5 py-1 text-[10px] font-bold uppercase',
+                        busyId === hold.id && 'opacity-50',
+                      )}
+                    >
+                      Discard
+                    </button>
                   </div>
                 </div>
               </li>

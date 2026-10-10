@@ -1,5 +1,13 @@
 import { db, generateId } from './database'
-import type { BaseEntity, CreateTaskInput, Setting, Task, UpdateTaskInput } from '@/lib/shared/types'
+import type {
+  BaseEntity,
+  CreateHeldCartInput,
+  CreateTaskInput,
+  HeldCartRecord,
+  Setting,
+  Task,
+  UpdateTaskInput,
+} from '@/lib/shared/types'
 import type { Database } from 'better-sqlite3'
 
 export interface CrudService<T extends BaseEntity> {
@@ -153,5 +161,68 @@ export class SettingsService {
   }
 }
 
+export class HeldCartsService {
+  private db: Database
+
+  constructor() {
+    this.db = db
+  }
+
+  listByVendor(vendorId: string): HeldCartRecord[] {
+    const stmt = this.db.prepare(
+      `SELECT * FROM held_carts WHERE vendor_id = ? ORDER BY created_at DESC LIMIT 50`,
+    )
+    return stmt.all(vendorId) as HeldCartRecord[]
+  }
+
+  getById(id: string): HeldCartRecord | undefined {
+    const stmt = this.db.prepare(`SELECT * FROM held_carts WHERE id = ?`)
+    return stmt.get(id) as HeldCartRecord | undefined
+  }
+
+  create(data: CreateHeldCartInput): HeldCartRecord {
+    const id = generateId()
+    const now = new Date().toISOString()
+    const record: HeldCartRecord = {
+      id,
+      vendor_id: data.vendor_id,
+      label: data.label?.trim() || null,
+      payload: data.payload,
+      total: data.total,
+      item_count: data.item_count,
+      created_at: now,
+      updated_at: now,
+    }
+    this.db
+      .prepare(
+        `INSERT INTO held_carts (id, vendor_id, label, payload, total, item_count, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        record.id,
+        record.vendor_id,
+        record.label,
+        record.payload,
+        record.total,
+        record.item_count,
+        record.created_at,
+        record.updated_at,
+      )
+    return record
+  }
+
+  delete(id: string, vendorId?: string): boolean {
+    if (vendorId) {
+      const stmt = this.db.prepare(
+        `DELETE FROM held_carts WHERE id = ? AND vendor_id = ?`,
+      )
+      return stmt.run(id, vendorId).changes > 0
+    }
+    const stmt = this.db.prepare(`DELETE FROM held_carts WHERE id = ?`)
+    return stmt.run(id).changes > 0
+  }
+}
+
 export const tasksService = new TasksService()
 export const settingsService = new SettingsService()
+export const heldCartsService = new HeldCartsService()

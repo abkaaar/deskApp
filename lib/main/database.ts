@@ -27,6 +27,18 @@ const schemas = {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `,
+  held_carts: `
+    CREATE TABLE IF NOT EXISTS held_carts (
+      id TEXT PRIMARY KEY,
+      vendor_id TEXT NOT NULL,
+      label TEXT,
+      payload TEXT NOT NULL,
+      total REAL NOT NULL DEFAULT 0,
+      item_count INTEGER NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `,
 }
 
 export function initializeDatabase() {
@@ -47,6 +59,11 @@ export function initializeDatabase() {
     defaultSettings.forEach((setting) => {
       insertSetting.run(setting.key, setting.value)
     })
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_held_carts_vendor
+      ON held_carts (vendor_id, created_at DESC)
+    `)
 
     console.warn('Database initialized successfully')
   } catch (error) {

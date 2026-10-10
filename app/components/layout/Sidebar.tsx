@@ -17,11 +17,12 @@ import {
 } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 
-import { AccountAvatar, AccountSheet } from '@/app/components/layout/AccountSheet'
+import brandLogo from '@/resources/icons/logo.png'
+import { AccountSheet } from '@/app/components/layout/AccountSheet'
 import { useAuthStore } from '@/app/stores/authStore'
 import { useSyncStore } from '@/app/stores/syncStore'
 import { isBrowserOffline } from '@/lib/checkout/saleOutbox'
-import { cn, initials } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { permissionForNavHref } from '@/lib/vendor-staff-permissions'
 import { toast } from 'sonner'
 
@@ -133,7 +134,6 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps) {
     actor === 'staff' && staff?.full_name
       ? staff.full_name
       : profile?.business_name || profile?.name || profile?.username || 'Restaurant'
-  const avatarText = initials(displayName)
   const planText =
     actor === 'staff'
       ? `${staff?.role || 'staff'} · ${profile?.business_name || profile?.username || 'Restaurant'}`
@@ -174,7 +174,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps) {
               collapsed ? 'flex justify-center' : 'flex flex-1 items-start gap-2.5',
             )}
           >
-            <AccountAvatar label={avatarText} size="sm" />
+         
             {!collapsed && (
               <div className="min-w-0 flex-1 pt-0.5">
                 <p className="truncate text-sm font-bold text-foreground">{displayName}</p>

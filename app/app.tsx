@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { HashRouter, Route, Routes } from 'react-router-dom'
 
 import { AuthGate } from './components/auth/AuthGate'
 import { Toaster } from './components/ui/sonner'
@@ -8,7 +8,7 @@ import { SignInPage } from './pages/SignInPage'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <div className="h-full min-h-0">
         <Routes>
           <Route path="/sign-in" element={<SignInPage />} />
@@ -25,6 +25,6 @@ export default function App() {
         </Routes>
         <Toaster />
       </div>
-    </BrowserRouter>
+    </HashRouter>
   )
 }

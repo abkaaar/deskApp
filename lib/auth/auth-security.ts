@@ -9,14 +9,14 @@ export const AUTH_ERRORS = {
   emailNotRegistered:
     `No vendor account is linked to this email. Create an account on ${webBrandHost()} to get started.`,
   invalidPhone: 'Please enter a valid WhatsApp phone number',
-  invalidOtp: 'Enter the 6-digit code sent to your WhatsApp',
+  invalidOtp: 'Enter the 6-digit code sent to your email',
   verifyFailed: 'Invalid or expired verification code. Please try again.',
   notPremium:
     'Foodpos is for approved premium restaurant accounts only.',
   notRestaurant:
     'This app is for restaurant businesses only. Other vendor types should use the Foodma mobile app.',
   noDesktopAccess: 'Your account does not have access to Foodpos.',
-  noProfile: 'No vendor account is linked to this phone number.',
+  noProfile: 'No vendor account is linked to this email.',
   tooManyAttempts: 'Too many attempts. Request a new code and try again.',
   sendFailed: 'Could not send verification code. Please try again shortly.',
   sessionExpired: 'Your session expired. Please sign in again.',

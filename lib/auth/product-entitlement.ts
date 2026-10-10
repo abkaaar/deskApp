@@ -53,8 +53,11 @@ export function canUseProduct(
   subscription?: EntitlementSubscription | null,
   now: Date = new Date(),
 ): boolean {
-  if (profile.role !== 'premium') return false
-  if (profile.premium_status && profile.premium_status !== 'premium') {
+  if (profile.role?.toLowerCase() !== 'premium') return false
+  if (
+    profile.premium_status &&
+    profile.premium_status.toLowerCase() !== 'premium'
+  ) {
     return false
   }
   if (isSubscriptionEntitled(subscription, now)) return true

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useAuthStore } from '@/app/stores/authStore'
 import { isWalkInOrder } from '@/lib/dashboard/stats'
-import { parsePosNotes } from '@/lib/checkout/pos-order'
+import { isHeldPosOrder, parsePosNotes } from '@/lib/checkout/pos-order'
 import { OrderService } from '@/lib/services/orderService'
 import { getSupabaseClient } from '@/lib/supabase/client'
 import type { PaymentMethod } from '@/lib/checkout/types'
@@ -150,10 +150,11 @@ export function useVendorTransactions() {
   const transactions = useMemo(() => {
     return orders
       .filter((order) => order.status !== 'cancelled' && order.status !== 'pending_payment')
+      // Exclude unpaid legacy cloud holds (new holds are local only).
+      .filter((order) => !(isHeldPosOrder(order) && order.payment_status !== 'paid'))
       .filter(
         (order) =>
           order.payment_status === 'paid' ||
-          isWalkInOrder(order) ||
           order.status === 'delivered',
       )
       .map(toTransactionRow)

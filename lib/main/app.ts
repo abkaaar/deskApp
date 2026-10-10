@@ -1,7 +1,7 @@
 import { BrowserWindow, shell, app, protocol, net, screen } from 'electron'
 import { join } from 'path'
 import { registerWindowIPC } from '@/lib/window/ipcEvents'
-import appIcon from '@/resources/build/icon.png?asset'
+import appIcon from '@/resources/icons/logo.png?asset'
 import { pathToFileURL } from 'url'
 import { APP_CONFIG } from '@/lib/shared/config'
 
@@ -29,27 +29,42 @@ export function createAppWindow(): void {
 
   registerWindowIPC(mainWindow)
 
-  const revealWindow = () => {
+  let revealed = false
+  const revealWindow = (reason: string) => {
+    if (revealed || mainWindow.isDestroyed()) return
+    revealed = true
+    console.info(`[window] reveal (${reason})`)
     placeWindowOnScreen(mainWindow)
     if (!mainWindow.isVisible()) mainWindow.show()
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.focus()
   }
 
-  mainWindow.once('ready-to-show', revealWindow)
+  mainWindow.once('ready-to-show', () => revealWindow('ready-to-show'))
 
-  // Fallback if ready-to-show never fires (common with failed/slow renderer loads)
-  setTimeout(() => {
-    if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-      console.warn('ready-to-show timed out — forcing window reveal')
-      revealWindow()
-    }
-  }, 2500)
+  mainWindow.webContents.once('dom-ready', () => revealWindow('dom-ready'))
+  mainWindow.webContents.once('did-finish-load', () => revealWindow('did-finish-load'))
 
   mainWindow.webContents.on('did-fail-load', (_event, code, desc, url) => {
-    console.error('Renderer failed to load:', { code, desc, url })
-    revealWindow()
+    console.error('[window] Renderer failed to load:', { code, desc, url })
+    revealWindow('did-fail-load')
   })
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[window] render-process-gone:', details)
+  })
+
+  // Last resort if first paint never signals
+  setTimeout(() => {
+    if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      console.warn('[window] reveal timed out — forcing window show')
+      revealWindow('timeout')
+    }
+  }, 8000)
+
+  if (!app.isPackaged) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' })
+  }
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -57,9 +72,9 @@ export function createAppWindow(): void {
   })
 
   if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    void mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 

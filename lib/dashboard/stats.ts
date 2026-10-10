@@ -1,4 +1,4 @@
-import { isPosOrder, parsePosNotes } from '@/lib/checkout/pos-order'
+import { isHeldPosOrder, isPosOrder, parsePosNotes } from '@/lib/checkout/pos-order'
 import { isActiveDelivery } from '@/lib/delivery/status'
 import type { Delivery } from '@/lib/types/delivery'
 import type { Order } from '@/lib/types/order'
@@ -44,7 +44,10 @@ export function isWalkInOrder(order: Order): boolean {
 }
 
 function isCountableToday(order: Order): boolean {
-  return order.status !== 'cancelled' && order.status !== 'pending_payment'
+  if (order.status === 'cancelled' || order.status === 'pending_payment') return false
+  // Legacy cloud holds must not count as sales / kitchen load.
+  if (isHeldPosOrder(order) && order.payment_status !== 'paid') return false
+  return true
 }
 
 function customerKey(order: Order, vendorId?: string): string {
@@ -81,7 +84,9 @@ export function computeDashboardStats(
   const online = todays.filter((order) => !isWalkInOrder(order))
 
   const revenueOrders = todays.filter(
-    (order) => order.payment_status === 'paid' || order.status === 'delivered' || isWalkInOrder(order),
+    (order) =>
+      order.payment_status === 'paid' ||
+      (order.status === 'delivered' && order.payment_status !== 'pending'),
   )
   const todaysRevenue = revenueOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0)
 

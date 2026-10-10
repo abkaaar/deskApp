@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 
+import type { HeldCartPayload } from '@/lib/checkout/heldCarts'
 import type { CartLine, MenuAddon, MenuPost, OrderType, PaymentMethod } from '@/lib/checkout/types'
 
 export type CheckoutMode = 'keypad' | 'menu' | 'favorites'
@@ -101,6 +102,7 @@ type CheckoutState = {
   beginSaleSubmit: () => SaleSubmitSnapshot | null
   finishSaleSubmit: () => void
   resetSale: () => void
+  restoreHeldSale: (payload: HeldCartPayload) => boolean
   getSubtotal: () => number
   getDiscount: () => number
   getTotal: () => number
@@ -347,6 +349,34 @@ export const useCheckoutStore = create<CheckoutState>((set, get) => ({
       tableLabel: null,
       isSubmitting: false,
     })
+  },
+
+  restoreHeldSale: (payload) => {
+    if (!payload?.cart?.length) return false
+    const cart = payload.cart.map((line) => ({
+      ...line,
+      line_key: line.line_key || `${line.post_id}:${crypto.randomUUID()}`,
+      quantity: Math.max(1, Number(line.quantity) || 1),
+      subtotal:
+        Number(line.subtotal) ||
+        Math.round((Number(line.price) || 0) * Math.max(1, Number(line.quantity) || 1)),
+    }))
+    set({
+      cart,
+      orderType: payload.orderType || 'takeaway',
+      discountNaira: Math.max(0, Number(payload.discountNaira) || 0),
+      customerId: payload.customerId ?? null,
+      customerName: payload.customerName ?? null,
+      tableId: payload.tableId ?? null,
+      tableLabel: payload.tableLabel ?? null,
+      cashTendered: '',
+      customAmount: '',
+      customNote: '',
+      searchQuery: '',
+      activeCategory: null,
+      isSubmitting: false,
+    })
+    return true
   },
 
   getSubtotal: () => computeSubtotal(get().cart),

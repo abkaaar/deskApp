@@ -51,9 +51,18 @@ export async function createPosOrderFromCart(
     return { success: false, error: entitled.error, retryable: false }
   }
 
+  // Holds are local drafts (SQLite). Never create a cloud order for hold:true.
+  if (payload.hold === true) {
+    return {
+      success: false,
+      error: 'Hold saves the cart locally — use Hold from checkout, not order create.',
+      retryable: false,
+    }
+  }
+
   const supabase = getSupabaseClient()
   const decrementedPosts: { postId: string; quantity: number }[] = []
-  const isHold = payload.hold === true
+  const isHold = false
 
   try {
     const posExternalId = payload.posExternalId?.trim() || crypto.randomUUID()

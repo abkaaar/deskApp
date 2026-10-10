@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+import brandLogo from '@/resources/icons/logo.png'
 import { Titlebar, TitlebarProps } from './Titlebar'
 import { TitlebarContextProvider } from './TitlebarContext'
 
@@ -8,8 +9,8 @@ export const WindowContextProvider = ({ children, titlebar }: WindowContextProvi
   const [initProps, setInitProps] = useState<WindowInitProps | undefined>()
 
   const defaultTitlebar: TitlebarProps = {
-    title: 'desktop App',
-    icon: 'appIcon.png',
+    title: 'Foodpos',
+    icon: brandLogo,
     titleCentered: false,
     menuItems: [],
   }

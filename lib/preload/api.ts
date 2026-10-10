@@ -1,5 +1,11 @@
 import { ipcRenderer } from 'electron'
-import type { CreateTaskInput, Task, UpdateTaskInput } from '@/lib/shared/types'
+import type {
+  CreateHeldCartInput,
+  CreateTaskInput,
+  HeldCartRecord,
+  Task,
+  UpdateTaskInput,
+} from '@/lib/shared/types'
 
 const api = {
   send: (channel: string, ...args: unknown[]) => {
@@ -42,6 +48,17 @@ const api = {
     removeItem: (key: string): Promise<void> =>
       ipcRenderer.invoke('auth:removeItem', key),
     clearAll: (): Promise<void> => ipcRenderer.invoke('auth:clearAll'),
+  },
+
+  heldCarts: {
+    list: (vendorId: string): Promise<HeldCartRecord[]> =>
+      ipcRenderer.invoke('heldCarts:list', vendorId),
+    getById: (id: string): Promise<HeldCartRecord | undefined> =>
+      ipcRenderer.invoke('heldCarts:getById', id),
+    create: (data: CreateHeldCartInput): Promise<HeldCartRecord> =>
+      ipcRenderer.invoke('heldCarts:create', data),
+    delete: (id: string, vendorId?: string): Promise<boolean> =>
+      ipcRenderer.invoke('heldCarts:delete', id, vendorId),
   },
 }
 

@@ -6,6 +6,19 @@ export function registerCrudHandlers<T extends BaseEntity>(
   namespace: string,
   service: CrudService<T>
 ) {
+  const channels = [
+    `${namespace}:getAll`,
+    `${namespace}:getById`,
+    `${namespace}:create`,
+    `${namespace}:update`,
+    `${namespace}:delete`,
+    `${namespace}:search`,
+  ] as const
+
+  for (const channel of channels) {
+    ipcMain.removeHandler(channel)
+  }
+
   ipcMain.handle(`${namespace}:getAll`, () => service.getAll())
   ipcMain.handle(`${namespace}:getById`, (_, id: string) => service.getById(id))
   ipcMain.handle(`${namespace}:create`, (_, data: Omit<T, keyof BaseEntity>) =>

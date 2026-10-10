@@ -1,5 +1,6 @@
-import type { KitchenStatus, Order, OrderStatus } from '@/lib/types/order'
+import { isHeldPosOrder } from '@/lib/checkout/pos-order'
 import { effectiveKitchenLane, orderStatusToKitchenStatus } from '@/lib/checkout/posOrderStatus'
+import type { KitchenStatus, Order, OrderStatus } from '@/lib/types/order'
 
 const RECENT_COMPLETED_MS = 15 * 60 * 1000
 
@@ -56,9 +57,13 @@ export function getKdsRecallAction(order: Order): {
 }
 
 export function splitKitchenColumns(orders: Order[]) {
-  const preparing = orders.filter((order) => effectiveKitchenLane(order) === 'preparing')
-  const ready = orders.filter((order) => effectiveKitchenLane(order) === 'ready')
-  const completed = orders.filter((order) => effectiveKitchenLane(order) === 'completed')
+  // Unpaid held tickets (legacy cloud holds) must not appear on KDS.
+  const live = orders.filter(
+    (order) => !(isHeldPosOrder(order) && order.payment_status !== 'paid'),
+  )
+  const preparing = live.filter((order) => effectiveKitchenLane(order) === 'preparing')
+  const ready = live.filter((order) => effectiveKitchenLane(order) === 'ready')
+  const completed = live.filter((order) => effectiveKitchenLane(order) === 'completed')
   return { preparing, ready, completed }
 }
 

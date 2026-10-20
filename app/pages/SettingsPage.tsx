@@ -155,9 +155,6 @@ export function SettingsPage() {
               <p className="text-sm text-muted-foreground text-italic">By Foodma Technologies</p>
             </div>
           </div>
-
-         
-
          
         </Card>
       </div>

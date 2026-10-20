@@ -156,7 +156,7 @@ export function HeldOrdersPanel({ onResumed }: HeldOrdersPanelProps) {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-xs font-medium text-muted-foreground">
-                      {hold.label || `#${hold.id.slice(0, 8)}`}
+                      {hold.label || `#${String(hold.id).slice(0, 8)}`}
                     </p>
                     <p className="text-sm font-semibold">
                       {formatCurrency(hold.total)} · {hold.itemCount} items

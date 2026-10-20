@@ -97,6 +97,11 @@ export class OrderService {
     return map
   }
 
+  /**
+   * Kitchen / fulfillment status only.
+   * Must never deduct stock, charge payment, or insert line items —
+   * so KDS Recall (delivered → ready) cannot double-consume inventory.
+   */
   static async updateOrderStatus(
     orderId: string,
     newStatus: OrderStatus,
@@ -124,6 +129,40 @@ export class OrderService {
 
       if (additionalData?.delivery_time) {
         updateData.delivery_time = additionalData.delivery_time
+      }
+
+      // Cancel before cooking: restore menu stock once for paid POS sales that
+      // never reached ready/delivered (food not finished).
+      if (newStatus === 'cancelled') {
+        const { data: existing } = await supabase
+          .from('orders')
+          .select('payment_status, kitchen_status, status, source')
+          .eq('id', orderId)
+          .eq('vendor_id', vendorId)
+          .maybeSingle()
+
+        const kitchen = String(existing?.kitchen_status || '').toLowerCase()
+        const payment = String(existing?.payment_status || '').toLowerCase()
+        const finished =
+          kitchen === 'ready' ||
+          kitchen === 'completed' ||
+          kitchen === 'delivered' ||
+          existing?.status === 'delivered' ||
+          existing?.status === 'ready'
+
+        if (payment === 'paid' && !finished) {
+          const { data: lines } = await supabase
+            .from('order_line_items')
+            .select('post_id, quantity')
+            .eq('order_id', orderId)
+          for (const line of lines ?? []) {
+            if (!line.post_id) continue
+            await supabase.rpc('restore_stock', {
+              p_post_id: line.post_id,
+              p_quantity: line.quantity,
+            })
+          }
+        }
       }
 
       const { error } = await supabase

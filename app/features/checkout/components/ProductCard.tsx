@@ -13,9 +13,16 @@ type ProductCardProps = {
 
 export function ProductCard({ post, onAdd, favorited = false, onToggleFavorite }: ProductCardProps) {
   const price = post.price ?? 0
-  const outOfStock =
-    post.is_available === false || (post.stock_quantity != null && post.stock_quantity <= 0)
-  const sellable = !outOfStock && price > 0
+  const trulyOutOfStock = post.stock_quantity != null && post.stock_quantity <= 0
+  const hiddenByMerchant =
+    post.is_available === false && !trulyOutOfStock
+  const blocked = trulyOutOfStock || post.is_available === false
+  const sellable = !blocked && price > 0
+  const unavailableLabel = trulyOutOfStock
+    ? 'Out of stock'
+    : hiddenByMerchant
+      ? 'Hidden'
+      : 'Unavailable'
 
   return (
     <div
@@ -61,11 +68,7 @@ export function ProductCard({ post, onAdd, favorited = false, onToggleFavorite }
         <div className="flex flex-1 flex-col gap-1 p-2">
           <p className="line-clamp-2 text-sm font-semibold text-foreground">{post.title}</p>
           <p className="text-sm font-medium">
-            {!sellable
-              ? outOfStock
-                ? 'Out of stock'
-                : 'Unavailable'
-              : formatCurrency(price)}
+            {!sellable ? unavailableLabel : formatCurrency(price)}
           </p>
           {post.stock_quantity != null && post.stock_quantity > 0 && (
             <p className="text-[11px] text-muted-foreground">Stock {post.stock_quantity}</p>

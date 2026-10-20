@@ -53,6 +53,9 @@ function mapMovementRow(row: Record<string, unknown>): InventoryMovement {
     direction: delta < 0 ? 'out' : 'in',
     quantity: Math.abs(delta),
     notes: (row.notes as string | null) ?? null,
+    reference_type: (row.reference_type as string | null) ?? null,
+    reference_id: row.reference_id != null ? String(row.reference_id) : null,
+    created_by: row.created_by != null ? String(row.created_by) : null,
     created_at: String(row.created_at),
   }
 }

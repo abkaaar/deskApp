@@ -27,7 +27,16 @@ export type ReceiptData = {
   discount: number
   total: number
   createdAt: string
+  /** paid | unpaid | refunded */
+  paymentLabel?: 'PAID' | 'UNPAID' | 'REFUNDED'
   refunded?: boolean
+}
+
+function paymentLabelFromStatus(paymentStatus?: string | null): 'PAID' | 'UNPAID' | 'REFUNDED' {
+  const s = (paymentStatus || '').toLowerCase()
+  if (s === 'refunded') return 'REFUNDED'
+  if (s === 'paid' || s === 'completed') return 'PAID'
+  return 'UNPAID'
 }
 
 export type ReceiptSettings = {
@@ -67,10 +76,13 @@ export async function saveReceiptSettings(settings: ReceiptSettings): Promise<vo
 
 export function buildReceipt(data: ReceiptData): { text: string; data: ReceiptData } {
   const header = data.restaurantName.trim() || 'Foodma'
+  const label =
+    data.paymentLabel ??
+    (data.refunded ? 'REFUNDED' : 'PAID')
   const parts = [
     header,
     '----------------',
-    `Order: ${data.orderId.slice(0, 8)}`,
+    `Order: ${String(data.orderId).slice(0, 8)}`,
     `Date: ${new Date(data.createdAt).toLocaleString('en-NG')}`,
     `Type: ${data.orderType}`,
     `Pay: ${data.paymentMethod}`,
@@ -95,8 +107,12 @@ export function buildReceipt(data: ReceiptData): { text: string; data: ReceiptDa
   if (data.changeDue != null && data.changeDue > 0) {
     parts.push(`Change: ₦${Math.round(data.changeDue).toLocaleString('en-NG')}`)
   }
-  parts.push(data.refunded ? 'REFUNDED' : 'PAID')
-  return { text: parts.join('\n'), data }
+  if (label === 'UNPAID') {
+    parts.push('Received: ₦0')
+    parts.push(`Due: ₦${Math.round(data.total).toLocaleString('en-NG')}`)
+  }
+  parts.push(label)
+  return { text: parts.join('\n'), data: { ...data, paymentLabel: label } }
 }
 
 export function receiptFromOrder(order: Order, restaurantName?: string | null): ReceiptData {
@@ -130,17 +146,44 @@ export function receiptFromOrder(order: Order, restaurantName?: string | null): 
     discount: Number(order.promo_discount) || 0,
     total: Number(order.total) || 0,
     createdAt: order.created_at,
+    paymentLabel: paymentLabelFromStatus(order.payment_status),
     refunded: order.payment_status === 'refunded',
   }
 }
 
-export async function shareReceiptText(text: string): Promise<void> {
+async function copyTextRobust(text: string): Promise<boolean> {
   try {
-    await navigator.clipboard.writeText(text)
-    toast.success('Receipt copied')
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
   } catch {
-    window.alert(text)
+    // fall through
   }
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.position = 'fixed'
+    ta.style.left = '-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+export async function shareReceiptText(text: string): Promise<void> {
+  const ok = await copyTextRobust(text)
+  if (ok) {
+    toast.success('Receipt copied')
+    return
+  }
+  toast.error('Could not copy — showing receipt instead')
+  window.alert(text)
 }
 
 /** System print via a temporary window (works in Electron / Chromium). */

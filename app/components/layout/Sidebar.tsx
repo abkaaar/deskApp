@@ -17,7 +17,6 @@ import {
 } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 
-import brandLogo from '@/resources/icons/logo.png'
 import { AccountSheet } from '@/app/components/layout/AccountSheet'
 import { useAuthStore } from '@/app/stores/authStore'
 import { useSyncStore } from '@/app/stores/syncStore'

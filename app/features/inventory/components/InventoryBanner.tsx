@@ -19,9 +19,9 @@ export function InventoryBanner() {
             Kitchen ledger is the source of truth
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Track items with in / out / adjust / count movements. Menu stock is only a sellable cache
-            for linked finished products — not your kitchen inventory. Unlinked menu items keep a
-            separate menu sellable count.
+            Track items with in / out / adjust / count movements. Menu stock is a sellable cache
+            for linked finished products; recipes deduct ingredients on paid POS sales. Both must
+            allow the sale. Unlinked menu items keep a separate menu sellable count.
           </p>
         </div>
       </div>

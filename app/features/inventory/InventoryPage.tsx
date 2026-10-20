@@ -188,6 +188,8 @@ export function InventoryPage() {
                 <TableHead>Item</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Qty</TableHead>
+                <TableHead>Order / ref</TableHead>
+                <TableHead>Staff</TableHead>
                 <TableHead>When</TableHead>
               </TableRow>
             </TableHeader>
@@ -201,6 +203,16 @@ export function InventoryPage() {
                   <TableCell>
                     {movement.direction === 'out' ? '−' : '+'}
                     {movement.quantity}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {movement.reference_id
+                      ? `${movement.reference_type || 'ref'} #${String(movement.reference_id).slice(0, 8)}`
+                      : movement.notes?.slice(0, 40) || '—'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {movement.created_by
+                      ? String(movement.created_by).slice(0, 8)
+                      : '—'}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {new Date(movement.created_at).toLocaleString('en-NG', {

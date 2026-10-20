@@ -186,7 +186,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                   error: null,
                   initialized: true,
                 })
-              } else if (event === 'SIGNED_IN') {
+              } else {
+                // Entitlement lost on refresh (revoke / expired) — same as SIGNED_IN denial.
+                await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
+                await window.api.auth.clearAll().catch(() => undefined)
                 set({
                   status: 'unauthenticated',
                   profile: null,

@@ -61,15 +61,31 @@ export function TransactionCard({ row, onChanged }: TransactionCardProps) {
 
   const handleRefund = async () => {
     if (!profile?.id || !canRefund || busy) return
-    if (!window.confirm('Refund this sale? Stock will be restored when possible.')) return
+    if (!window.confirm('Refund this sale? This cannot be undone.')) return
+    const approved = window.confirm(
+      'Manager / owner approval required to continue.\n\nOK = approved\nCancel = abort refund',
+    )
+    if (!approved) return
+    const returned = window.confirm(
+      'Was sellable stock physically returned?\n\nOK = restore stock\nCancel = do not restore (consumed / damaged / not returned)',
+    )
+    const reason =
+      window.prompt('Refund reason (required for audit)', '')?.trim() || undefined
+    if (!reason) {
+      toast.error('Enter a refund reason to continue')
+      return
+    }
     setBusy(true)
     try {
-      const result = await refundPosOrder(order.id, profile.id)
+      const result = await refundPosOrder(order.id, profile.id, {
+        stockOutcome: returned ? 'returned_sellable' : 'not_returned',
+        reason,
+      })
       if (!result.ok) {
         toast.error(result.message)
         return
       }
-      toast.success('Sale refunded')
+      toast.success(returned ? 'Sale refunded · stock restored' : 'Sale refunded')
       onChanged?.()
     } finally {
       setBusy(false)

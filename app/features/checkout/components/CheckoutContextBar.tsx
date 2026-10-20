@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
+import {
+  listHeldCarts,
+  type HeldCartView,
+} from '@/lib/checkout/heldCarts'
 import { CustomerService } from '@/lib/services/customerService'
 import { TableService } from '@/lib/services/tableService'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import type { VendorCustomer } from '@/lib/types/customer'
 import type { RestaurantTable } from '@/lib/types/table'
 import { cn } from '@/lib/utils'
@@ -21,6 +26,8 @@ export function CheckoutContextBar({ vendorId, showContext }: CheckoutContextBar
   const tableLabel = useCheckoutStore((s) => s.tableLabel)
   const setCustomer = useCheckoutStore((s) => s.setCustomer)
   const setTable = useCheckoutStore((s) => s.setTable)
+  const restoreHeldSale = useCheckoutStore((s) => s.restoreHeldSale)
+  const cart = useCheckoutStore((s) => s.cart)
 
   const [customerOpen, setCustomerOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
@@ -249,15 +256,106 @@ export function CheckoutContextBar({ vendorId, showContext }: CheckoutContextBar
                 <button
                   key={t.id}
                   type="button"
-                  className="w-full rounded-xl px-3 py-3 text-left text-sm hover:bg-muted"
+                  className={cn(
+                    'w-full rounded-xl px-3 py-3 text-left text-sm hover:bg-muted',
+                    t.status === 'occupied' && 'border border-warning/40 bg-warning/5',
+                  )}
                   onClick={() => {
-                    setTable(t.id, t.label)
-                    setTableOpen(false)
+                    void (async () => {
+                      if (
+                        (t.status === 'occupied' || t.status === 'reserved') &&
+                        vendorId
+                      ) {
+                        // Prefer resuming a local hold for this table.
+                        let holdMatch: HeldCartView | null = null
+                        try {
+                          const holds = await listHeldCarts(vendorId)
+                          holdMatch =
+                            holds.find((h) => h.payload.tableId === t.id) ??
+                            holds.find((h) => h.payload.tableLabel === t.label) ??
+                            null
+                        } catch {
+                          holdMatch = null
+                        }
+                        if (holdMatch) {
+                          const resume = window.confirm(
+                            `Table ${t.label} has a held cart (${holdMatch.itemCount} items). Resume it?\n\nOK = resume held sale\nCancel = start a new draft on this table`,
+                          )
+                          if (resume) {
+                            if (cart.length > 0) {
+                              const wipe = window.confirm(
+                                'Current cart will be replaced by the held sale. Continue?',
+                              )
+                              if (!wipe) return
+                            }
+                            const ok = restoreHeldSale(holdMatch.payload)
+                            if (ok) {
+                              toast.success(`Resumed hold for ${t.label}`)
+                              setTableOpen(false)
+                              return
+                            }
+                          }
+                        }
+
+                        // Else look for an unpaid cloud POS order on this table.
+                        try {
+                          const supabase = getSupabaseClient()
+                          const { data } = await supabase
+                            .from('orders')
+                            .select('id, total, payment_status, pos_meta, notes')
+                            .eq('vendor_id', vendorId)
+                            .eq('source', 'pos')
+                            .neq('payment_status', 'paid')
+                            .neq('payment_status', 'refunded')
+                            .order('created_at', { ascending: false })
+                            .limit(30)
+                          const openBill = (data ?? []).find((row) => {
+                            const meta = row.pos_meta as Record<string, unknown> | null
+                            return (
+                              meta?.table_id === t.id ||
+                              (typeof row.notes === 'string' &&
+                                row.notes.includes(t.label))
+                            )
+                          })
+                          if (openBill) {
+                            const attach = window.confirm(
+                              `Table ${t.label} has open unpaid order #${String(openBill.id).slice(0, 8)} (₦${Math.round(Number(openBill.total) || 0).toLocaleString()}).\n\nOK = attach table to this draft anyway\nCancel = leave cart unchanged and open Tables/Orders to collect`,
+                            )
+                            if (!attach) {
+                              setTableOpen(false)
+                              toast.message(
+                                `Open unpaid bill #${String(openBill.id).slice(0, 8)} from Orders or Tables`,
+                              )
+                              return
+                            }
+                          } else {
+                            const ok = window.confirm(
+                              `Table ${t.label} is ${t.status}. Attach this new draft anyway?`,
+                            )
+                            if (!ok) return
+                          }
+                        } catch {
+                          const ok = window.confirm(
+                            `Table ${t.label} is ${t.status}. Attach this new draft anyway?`,
+                          )
+                          if (!ok) return
+                        }
+                      }
+
+                      setTable(t.id, t.label)
+                      if (vendorId && t.status === 'available') {
+                        void TableService.setStatus(vendorId, t.id, 'occupied').catch(
+                          () => undefined,
+                        )
+                      }
+                      setTableOpen(false)
+                    })()
                   }}
                 >
                   <span className="font-medium">{t.label}</span>
                   <span className="mt-0.5 block text-xs text-muted-foreground">
                     {t.zone || 'Floor'} · {t.seats} seats · {t.status}
+                    {t.status === 'occupied' ? ' · warn before new draft' : ''}
                   </span>
                 </button>
               ))}

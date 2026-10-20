@@ -91,6 +91,9 @@ export interface InventoryMovement {
   direction: InventoryMovementDirection
   quantity: number
   notes: string | null
+  reference_type?: string | null
+  reference_id?: string | null
+  created_by?: string | null
   created_at: string
 }
 

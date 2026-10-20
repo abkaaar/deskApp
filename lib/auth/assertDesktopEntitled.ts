@@ -9,21 +9,35 @@ export async function assertDesktopEntitled(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = getSupabaseClient()
 
-  const [{ data: profile }, { data: subscription }] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('role, premium_status, vendor_type')
-      .eq('id', vendorId)
-      .maybeSingle(),
-    supabase
-      .from('vendor_subscriptions')
-      .select('status, trial_ends_at, current_period_end')
-      .eq('vendor_id', vendorId)
-      .maybeSingle(),
-  ])
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  const authUserId = session?.user?.id ?? null
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, premium_status, vendor_type')
+    .eq('id', vendorId)
+    .maybeSingle()
 
   if (!profile) {
     return { ok: false, error: 'Vendor profile not found' }
+  }
+
+  let { data: subscription } = await supabase
+    .from('vendor_subscriptions')
+    .select('status, trial_ends_at, current_period_end')
+    .eq('vendor_id', vendorId)
+    .maybeSingle()
+
+  // Soft-migrate: auth.uid may differ from profiles.id; try session uid as fallback.
+  if (!subscription && authUserId && authUserId !== vendorId) {
+    const { data: byAuth } = await supabase
+      .from('vendor_subscriptions')
+      .select('status, trial_ends_at, current_period_end')
+      .eq('vendor_id', authUserId)
+      .maybeSingle()
+    subscription = byAuth
   }
 
   if (!canUseDesktopOrPos({ ...profile, id: vendorId }, subscription)) {

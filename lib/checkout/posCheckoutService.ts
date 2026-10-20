@@ -52,6 +52,7 @@ export async function createPosOrderFromCart(
   }
 
   // Holds are local drafts (SQLite). Never create a cloud order for hold:true.
+  // Stock / recipe deductions run only on paid create below — not on Hold or Kitchen Accept.
   if (payload.hold === true) {
     return {
       success: false,
@@ -343,6 +344,19 @@ export async function createPosOrderFromCart(
         .insert(lineItemsToInsert)
       if (lineItemsError) {
         console.error('Error inserting POS line items:', lineItemsError)
+        // Roll back the order — line items are required for web/kitchen accuracy.
+        await supabase.from('orders').delete().eq('id', order.id)
+        for (const prev of decrementedPosts) {
+          await supabase.rpc('restore_stock', {
+            p_post_id: prev.postId,
+            p_quantity: prev.quantity,
+          })
+        }
+        return {
+          success: false,
+          error: 'Could not save order items. Please try again.',
+          retryable: true,
+        }
       }
     }
 

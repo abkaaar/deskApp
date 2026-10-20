@@ -155,10 +155,11 @@ export function RecipeEditorSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>{recipe ? 'Edit recipe' : 'New recipe (Advanced)'}</SheetTitle>
+          <SheetTitle>{recipe ? 'Edit recipe' : 'New recipe'}</SheetTitle>
           <SheetDescription>
-            Link a menu item to ingredient quantities. POS sales explode this BOM into ledger
-            movements (opt-in Advanced tracking).
+            Link a menu item to ingredient quantities. Once saved, paid POS sales of that menu
+            item automatically deduct these ingredients into inventory movements. Menu hide-on-zero
+            is controlled under Inventory settings — there is no separate Advanced tracking switch.
           </SheetDescription>
         </SheetHeader>
 

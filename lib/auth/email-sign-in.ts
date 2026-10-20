@@ -7,7 +7,12 @@ export type EmailSignInResult =
   | { ok: true; email: string; maskedEmail: string }
   | {
       ok: false
-      code?: 'not_registered' | 'no_phone' | 'invalid_email' | 'send_failed'
+      code?:
+        | 'not_registered'
+        | 'no_phone'
+        | 'invalid_email'
+        | 'send_failed'
+        | 'rate_limited'
       message: string
     }
 
@@ -30,6 +35,7 @@ const FUNCTION_CODES = new Set<EmailSignInCode>([
   'no_phone',
   'invalid_email',
   'send_failed',
+  'rate_limited',
 ])
 const REACHABILITY_ERROR = 'Could not reach sign-in service'
 
@@ -91,6 +97,12 @@ function messageForFunctionError(payload: EmailSignInResponse): string {
   }
   if (payload.code === 'no_phone') {
     return payload.error || 'Account phone number is invalid'
+  }
+  if (payload.code === 'rate_limited') {
+    return (
+      payload.error ||
+      'Too many codes requested. Wait a minute and try again.'
+    )
   }
   if (payload.code === 'send_failed') {
     return payload.error || 'Failed to send verification code'

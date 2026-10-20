@@ -149,12 +149,25 @@ export function useVendorTransactions() {
 
   const transactions = useMemo(() => {
     return orders
-      .filter((order) => order.status !== 'cancelled' && order.status !== 'pending_payment')
+      .filter((order) => order.status !== 'pending_payment')
+      // Keep refunded sales visible even if legacy rows were also marked cancelled.
+      .filter((order) => {
+        if (order.payment_status === 'refunded') return true
+        return order.status !== 'cancelled'
+      })
       // Exclude unpaid legacy cloud holds (new holds are local only).
-      .filter((order) => !(isHeldPosOrder(order) && order.payment_status !== 'paid'))
+      .filter(
+        (order) =>
+          !(
+            isHeldPosOrder(order) &&
+            order.payment_status !== 'paid' &&
+            order.payment_status !== 'refunded'
+          ),
+      )
       .filter(
         (order) =>
           order.payment_status === 'paid' ||
+          order.payment_status === 'refunded' ||
           order.status === 'delivered',
       )
       .map(toTransactionRow)

@@ -62,6 +62,8 @@ export function InventorySettingsCard({
             </p>
             <p className="text-xs text-muted-foreground">
               Finished products linked to menu posts are hidden when stock reaches zero.
+              Recipe BOMs deduct ingredients on paid sales separately; menu stock is the
+              sellable cache — if either is insufficient, block the sale.
             </p>
           </div>
           <Switch

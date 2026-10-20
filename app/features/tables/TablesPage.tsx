@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeftRight, Combine, Plus, RefreshCw, Split, Table2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -11,6 +11,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/app/components/ui/sheet'
+import { formatCurrency } from '@/lib/checkout/format'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import { TableService } from '@/lib/services/tableService'
 import {
   TABLE_STATUS_LABELS,
@@ -21,6 +23,13 @@ import {
 import { TableSheet } from './components/TableSheet'
 import { TableTile } from './components/TableTile'
 import { useVendorTables } from './hooks/useVendorTables'
+
+type LinkedOrderHint = {
+  id: string | number
+  total: number
+  payment_status: string | null
+  status: string
+}
 
 const STATUSES: TableStatus[] = ['available', 'occupied', 'reserved', 'cleaning']
 
@@ -45,6 +54,45 @@ export function TablesPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [transferTargetId, setTransferTargetId] = useState('')
   const [busy, setBusy] = useState(false)
+  const [linkedOrders, setLinkedOrders] = useState<LinkedOrderHint[]>([])
+
+  useEffect(() => {
+    if (!vendorId || !active?.id || !actionsOpen) {
+      setLinkedOrders([])
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const supabase = getSupabaseClient()
+      const { data } = await supabase
+        .from('orders')
+        .select('id, total, payment_status, status, pos_meta, notes')
+        .eq('vendor_id', vendorId)
+        .eq('source', 'pos')
+        .order('created_at', { ascending: false })
+        .limit(40)
+      if (cancelled) return
+      const matches = (data ?? []).filter((row) => {
+        const meta = row.pos_meta as Record<string, unknown> | null
+        if (meta?.table_id === active.id) return true
+        if (typeof row.notes === 'string' && row.notes.includes(active.label)) {
+          return true
+        }
+        return false
+      })
+      setLinkedOrders(
+        matches.slice(0, 5).map((row) => ({
+          id: row.id,
+          total: Number(row.total) || 0,
+          payment_status: row.payment_status,
+          status: row.status,
+        })),
+      )
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [vendorId, active?.id, active?.label, actionsOpen])
 
   const zones = useMemo(() => {
     const map = new Map<string, RestaurantTable[]>()
@@ -305,6 +353,36 @@ export function TablesPage() {
                     </Button>
                   ))}
                 </div>
+              </div>
+
+              <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Linked bills
+                </p>
+                {linkedOrders.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No recent POS orders linked to this table in cloud.
+                    Local holds are under Checkout → Held.
+                  </p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {linkedOrders.map((o) => (
+                      <li key={String(o.id)} className="text-sm">
+                        <span className="font-medium">#{String(o.id).slice(0, 8)}</span>
+                        <span className="text-muted-foreground">
+                          {' '}
+                          · {formatCurrency(o.total)} · {o.payment_status || o.status}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {activeSession ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Open session since{' '}
+                    {new Date(activeSession.opened_at).toLocaleString('en-NG')}
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-2">

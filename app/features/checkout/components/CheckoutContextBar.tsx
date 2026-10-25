@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Monitor } from 'lucide-react'
 import { toast } from 'sonner'
 
 import {
   listHeldCarts,
   type HeldCartView,
 } from '@/lib/checkout/heldCarts'
+import { pushCustomerDisplaySnapshot } from '@/lib/checkout/customerDisplayMirror'
 import { CustomerService } from '@/lib/services/customerService'
 import { TableService } from '@/lib/services/tableService'
 import { getSupabaseClient } from '@/lib/supabase/client'
@@ -38,6 +40,12 @@ export function CheckoutContextBar({ vendorId, showContext }: CheckoutContextBar
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [customerDisplayOpen, setCustomerDisplayOpen] = useState(false)
+  const [displayBusy, setDisplayBusy] = useState(false)
+
+  useEffect(() => {
+    void window.api.customerDisplay.isOpen().then(setCustomerDisplayOpen)
+  }, [])
 
   useEffect(() => {
     if (!vendorId || (!customerOpen && !tableOpen)) return
@@ -66,6 +74,32 @@ export function CheckoutContextBar({ vendorId, showContext }: CheckoutContextBar
       ] as const,
     [],
   )
+
+  const toggleCustomerDisplay = async () => {
+    setDisplayBusy(true)
+    try {
+      if (customerDisplayOpen) {
+        await window.api.customerDisplay.close()
+        setCustomerDisplayOpen(false)
+        toast.success('Customer display closed')
+      } else {
+        const displays = await window.api.customerDisplay.listDisplays()
+        const external = displays.find((d) => !d.isPrimary)
+        await window.api.customerDisplay.open(external?.id)
+        setCustomerDisplayOpen(true)
+        await pushCustomerDisplaySnapshot()
+        toast.success(
+          external
+            ? 'Customer display opened on second screen'
+            : 'Customer display opened — drag it to the customer screen',
+        )
+      }
+    } catch {
+      toast.error('Could not toggle customer display')
+    } finally {
+      setDisplayBusy(false)
+    }
+  }
 
   const handleCreate = async () => {
     if (!vendorId || !name.trim()) return
@@ -112,31 +146,47 @@ export function CheckoutContextBar({ vendorId, showContext }: CheckoutContextBar
         ))}
       </div>
 
-      {showContext && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setCustomerOpen(true)}
-            className="rounded-full border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-          >
-            {customerName || 'Attach customer'}
-          </button>
-          {orderType === 'dine_in' && (
+      <div className="flex flex-wrap gap-2">
+        {showContext && (
+          <>
             <button
               type="button"
-              onClick={() => setTableOpen(true)}
-              className={cn(
-                'rounded-full border px-3.5 py-2 text-sm font-medium transition hover:bg-muted',
-                tableLabel
-                  ? 'border-border bg-card text-foreground'
-                  : 'border-warning/40 bg-warning/10 text-warning',
-              )}
+              onClick={() => setCustomerOpen(true)}
+              className="rounded-full border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
             >
-              {tableLabel || 'Select table'}
+              {customerName || 'Attach customer'}
             </button>
+            {orderType === 'dine_in' && (
+              <button
+                type="button"
+                onClick={() => setTableOpen(true)}
+                className={cn(
+                  'rounded-full border px-3.5 py-2 text-sm font-medium transition hover:bg-muted',
+                  tableLabel
+                    ? 'border-border bg-card text-foreground'
+                    : 'border-warning/40 bg-warning/10 text-warning',
+                )}
+              >
+                {tableLabel || 'Select table'}
+              </button>
+            )}
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => void toggleCustomerDisplay()}
+          disabled={displayBusy}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition hover:bg-muted',
+            customerDisplayOpen
+              ? 'border-primary/40 bg-primary/10 text-primary'
+              : 'border-border bg-card text-foreground',
           )}
-        </div>
-      )}
+        >
+          <Monitor className="h-4 w-4" />
+          {customerDisplayOpen ? 'Customer display on' : 'Customer display'}
+        </button>
+      </div>
 
       {customerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

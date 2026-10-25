@@ -1,9 +1,17 @@
 import { BrowserWindow, shell, app, protocol, net, screen } from 'electron'
 import { join } from 'path'
 import { registerWindowIPC } from '@/lib/window/ipcEvents'
+import { disposeCustomerDisplay } from '@/lib/main/customerDisplay'
 import appIcon from '@/resources/icons/logo.png?asset'
 import { pathToFileURL } from 'url'
 import { APP_CONFIG } from '@/lib/shared/config'
+
+let mainAppWindow: BrowserWindow | null = null
+
+export function getMainAppWindow(): BrowserWindow | null {
+  if (mainAppWindow && !mainAppWindow.isDestroyed()) return mainAppWindow
+  return null
+}
 
 export function createAppWindow(): void {
   registerResourcesProtocol()
@@ -28,6 +36,12 @@ export function createAppWindow(): void {
   })
 
   registerWindowIPC(mainWindow)
+  mainAppWindow = mainWindow
+
+  mainWindow.on('closed', () => {
+    if (mainAppWindow === mainWindow) mainAppWindow = null
+    disposeCustomerDisplay()
+  })
 
   let revealed = false
   const revealWindow = (reason: string) => {

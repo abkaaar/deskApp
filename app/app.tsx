@@ -2,6 +2,7 @@ import { HashRouter, Route, Routes } from 'react-router-dom'
 
 import { AuthGate } from './components/auth/AuthGate'
 import { Toaster } from './components/ui/sonner'
+import { CustomerDisplayPage } from './pages/CustomerDisplayPage'
 import { Layout } from './pages/Layout'
 import { Main } from './pages/Main'
 import { SignInPage } from './pages/SignInPage'
@@ -11,6 +12,7 @@ export default function App() {
     <HashRouter>
       <div className="h-full min-h-0">
         <Routes>
+          <Route path="/customer-display" element={<CustomerDisplayPage />} />
           <Route path="/sign-in" element={<SignInPage />} />
           <Route
             path="/*"

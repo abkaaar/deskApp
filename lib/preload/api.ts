@@ -1,4 +1,4 @@
-import { ipcRenderer } from 'electron'
+import { ipcRenderer, type IpcRendererEvent } from 'electron'
 import type {
   CreateHeldCartInput,
   CreateTaskInput,
@@ -6,6 +6,8 @@ import type {
   Task,
   UpdateTaskInput,
 } from '@/lib/shared/types'
+import type { CustomerDisplayInfo, CustomerDisplayState } from '@/lib/shared/customerDisplay'
+import type { UpdaterStatus } from '@/lib/shared/updater'
 
 const api = {
   send: (channel: string, ...args: unknown[]) => {
@@ -19,6 +21,38 @@ const api = {
   },
   removeAllListeners: (channel: string) => {
     ipcRenderer.removeAllListeners(channel)
+  },
+
+  app: {
+    getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
+  },
+
+  updater: {
+    check: (): Promise<UpdaterStatus> => ipcRenderer.invoke('updater:check'),
+    download: (): Promise<{ status: string; message?: string }> =>
+      ipcRenderer.invoke('updater:download'),
+    install: (): Promise<{ status: string }> => ipcRenderer.invoke('updater:install'),
+    onStatus: (handler: (status: UpdaterStatus) => void): (() => void) => {
+      const listener = (_: IpcRendererEvent, status: UpdaterStatus) => handler(status)
+      ipcRenderer.on('updater:status', listener)
+      return () => ipcRenderer.removeListener('updater:status', listener)
+    },
+  },
+
+  customerDisplay: {
+    open: (displayId?: number): Promise<boolean> =>
+      ipcRenderer.invoke('customerDisplay:open', displayId),
+    close: (): Promise<boolean> => ipcRenderer.invoke('customerDisplay:close'),
+    isOpen: (): Promise<boolean> => ipcRenderer.invoke('customerDisplay:isOpen'),
+    listDisplays: (): Promise<CustomerDisplayInfo[]> =>
+      ipcRenderer.invoke('customerDisplay:listDisplays'),
+    pushState: (state: CustomerDisplayState): Promise<boolean> =>
+      ipcRenderer.invoke('customerDisplay:pushState', state),
+    onState: (handler: (state: CustomerDisplayState) => void): (() => void) => {
+      const listener = (_: IpcRendererEvent, state: CustomerDisplayState) => handler(state)
+      ipcRenderer.on('customerDisplay:state', listener)
+      return () => ipcRenderer.removeListener('customerDisplay:state', listener)
+    },
   },
 
   tasks: {

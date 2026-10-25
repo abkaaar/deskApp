@@ -1,6 +1,6 @@
 {
   "name": "foodma-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Foodpos — restaurant POS and operations for the Foodma ecosystem",
   "author": "Foodma",
   "main": "./out/main/main.js",
@@ -39,6 +39,7 @@
     "better-sqlite3": "^12.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.11",
     "lucide-react": "^0.525.0",
     "react-router-dom": "^7.7.1",
     "sonner": "^2.0.6",

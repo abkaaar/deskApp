@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Info, Palette, Printer } from 'lucide-react'
+import { Info, Palette, Printer, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '../components/ui/button'
@@ -7,15 +7,40 @@ import { Switch } from '../components/ui/switch'
 import { Card } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { APP_CONFIG } from '@/lib/shared/config'
+import type { UpdaterStatus } from '@/lib/shared/updater'
 import {
   loadReceiptSettings,
   saveReceiptSettings,
   type ReceiptSettings,
 } from '@/lib/receipt/receiptService'
 
+function statusLabel(status: UpdaterStatus | null): string {
+  if (!status) return ''
+  switch (status.status) {
+    case 'checking':
+      return 'Checking for updates…'
+    case 'available':
+      return `Update available: v${status.version}`
+    case 'not-available':
+      return `You're on the latest version (v${status.version})`
+    case 'downloading':
+      return `Downloading… ${status.percent}%`
+    case 'downloaded':
+      return `Update v${status.version} ready to install`
+    case 'error':
+      return status.message
+    case 'dev-skipped':
+      return status.message
+    default:
+      return ''
+  }
+}
+
 export function SettingsPage() {
   const [notifications, setNotifications] = useState(true)
-  const [appVersion, setAppVersion] = useState('1.0.0')
+  const [appVersion, setAppVersion] = useState('…')
+  const [updaterStatus, setUpdaterStatus] = useState<UpdaterStatus | null>(null)
+  const [updaterBusy, setUpdaterBusy] = useState(false)
   const [receipt, setReceipt] = useState<ReceiptSettings>({
     autoPrint: false,
     autoShow: true,
@@ -24,10 +49,14 @@ export function SettingsPage() {
   const [savingReceipt, setSavingReceipt] = useState(false)
 
   useEffect(() => {
-    window.api.settings.get('app_version').then((version) => {
-      if (version) setAppVersion(version)
-    })
+    void window.api.app.getVersion().then(setAppVersion)
     void loadReceiptSettings().then(setReceipt)
+    return window.api.updater.onStatus((status) => {
+      setUpdaterStatus(status)
+      if (status.status === 'error') {
+        toast.error(status.message)
+      }
+    })
   }, [])
 
   const saveReceipt = async () => {
@@ -39,6 +68,53 @@ export function SettingsPage() {
       toast.error('Could not save receipt settings')
     } finally {
       setSavingReceipt(false)
+    }
+  }
+
+  const checkForUpdates = async () => {
+    setUpdaterBusy(true)
+    try {
+      const result = await window.api.updater.check()
+      setUpdaterStatus(result)
+      if (result.status === 'available') {
+        toast.success(`Update v${result.version} available`)
+      } else if (result.status === 'not-available') {
+        toast.success('You are up to date')
+      } else if (result.status === 'dev-skipped') {
+        toast.message(result.message)
+      } else if (result.status === 'error') {
+        toast.error(result.message)
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not check for updates')
+    } finally {
+      setUpdaterBusy(false)
+    }
+  }
+
+  const downloadUpdate = async () => {
+    setUpdaterBusy(true)
+    try {
+      const result = await window.api.updater.download()
+      if (result.status === 'error') {
+        toast.error(result.message || 'Download failed')
+      } else if (result.status === 'dev-skipped') {
+        toast.message(result.message || 'Updates only work in the installed app')
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Download failed')
+    } finally {
+      setUpdaterBusy(false)
+    }
+  }
+
+  const installUpdate = async () => {
+    setUpdaterBusy(true)
+    try {
+      await window.api.updater.install()
+    } catch (error) {
+      setUpdaterBusy(false)
+      toast.error(error instanceof Error ? error.message : 'Could not install update')
     }
   }
 
@@ -147,15 +223,43 @@ export function SettingsPage() {
         </Card>
 
         <Card className="bg-card border rounded-lg p-6">
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-start justify-between gap-4 mb-4">
             <div>
               <h3 className="font-semibold">About</h3>
               <p className="text-sm text-muted-foreground">{APP_CONFIG.name}</p>
               <p className="text-sm text-muted-foreground">Version: {appVersion}</p>
-              <p className="text-sm text-muted-foreground text-italic">By Foodma Technologies</p>
+              <p className="text-sm text-muted-foreground italic">By Foodma Technologies</p>
+            </div>
+            <div className="h-10 w-10 bg-primary-bg rounded-lg flex items-center justify-center shrink-0">
+              <RefreshCw className="h-5 w-5 text-primary" />
             </div>
           </div>
-         
+
+          <div className="space-y-3">
+            {updaterStatus && (
+              <p className="text-sm text-muted-foreground">{statusLabel(updaterStatus)}</p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => void checkForUpdates()}
+                disabled={updaterBusy || updaterStatus?.status === 'downloading'}
+              >
+                {updaterBusy && updaterStatus?.status === 'checking'
+                  ? 'Checking…'
+                  : 'Check for updates'}
+              </Button>
+              {updaterStatus?.status === 'available' && (
+                <Button variant="secondary" onClick={() => void downloadUpdate()} disabled={updaterBusy}>
+                  Download update
+                </Button>
+              )}
+              {updaterStatus?.status === 'downloaded' && (
+                <Button onClick={() => void installUpdate()} disabled={updaterBusy}>
+                  Restart to install
+                </Button>
+              )}
+            </div>
+          </div>
         </Card>
       </div>
     </div>

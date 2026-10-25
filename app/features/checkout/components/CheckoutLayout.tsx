@@ -3,6 +3,7 @@ import { RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useAuthStore } from '@/app/stores/authStore'
+import { startCustomerDisplayMirror } from '@/lib/checkout/customerDisplayMirror'
 import { formatCurrency } from '@/lib/checkout/format'
 import { holdCurrentSale } from '@/lib/checkout/holdSale'
 import { cn } from '@/lib/utils'
@@ -45,6 +46,8 @@ export function CheckoutLayout() {
   const [split, setSplit] = useState(
     typeof window !== 'undefined' ? window.innerWidth >= SPLIT_MIN : true,
   )
+
+  useEffect(() => startCustomerDisplayMirror(), [])
 
   useEffect(() => {
     if (profile?.id) hydrateFavorites(profile.id)

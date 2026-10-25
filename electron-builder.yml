@@ -41,4 +41,7 @@ linux:
 appImage:
   artifactName: Foodpos-${version}.${ext}
 npmRebuild: false
-# Auto-update disabled for v1 — ship installers via GitHub Releases only.
+publish:
+  provider: github
+  owner: abkaaar
+  repo: deskApp

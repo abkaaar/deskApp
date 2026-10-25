@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 
 import { useAuthStore } from '@/app/stores/authStore'
 import { useSyncStore } from '@/app/stores/syncStore'
+import { pushCustomerDisplaySnapshot } from '@/lib/checkout/customerDisplayMirror'
 import { formatCurrency, parseKeypadAmount } from '@/lib/checkout/format'
 import { createPosOrderFromCart } from '@/lib/checkout/posCheckoutService'
 import {
@@ -144,6 +145,7 @@ export function PaymentDialog({ open, onClose }: PaymentDialogProps) {
       if (offline && method === 'cash') {
         enqueueOfflineSale(payload)
         refreshSync()
+        await pushCustomerDisplaySnapshot('paid', 'Payment received')
         resetSale()
         onClose()
         toast.success('Cash sale saved offline', {
@@ -166,6 +168,7 @@ export function PaymentDialog({ open, onClose }: PaymentDialogProps) {
         enqueueOfflineSale(payload)
         refreshSync()
         finishSaleSubmit()
+        await pushCustomerDisplaySnapshot('paid', 'Payment received')
         resetSale()
         onClose()
         toast.success('Cash sale saved offline', {
@@ -197,6 +200,7 @@ export function PaymentDialog({ open, onClose }: PaymentDialogProps) {
         createdAt: new Date().toISOString(),
       }, settings)
 
+      await pushCustomerDisplaySnapshot('paid', 'Payment received')
       resetSale()
       onClose()
       toast.success('Sale completed', {
@@ -208,6 +212,7 @@ export function PaymentDialog({ open, onClose }: PaymentDialogProps) {
         enqueueOfflineSale(payload)
         refreshSync()
         finishSaleSubmit()
+        await pushCustomerDisplaySnapshot('paid', 'Payment received')
         resetSale()
         onClose()
         toast.success('Cash sale saved offline', {

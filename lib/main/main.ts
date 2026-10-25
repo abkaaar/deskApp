@@ -1,9 +1,11 @@
 import { app, BrowserWindow } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { join } from 'path'
-import { createAppWindow, placeWindowOnScreen } from './app'
+import { createAppWindow, getMainAppWindow, placeWindowOnScreen } from './app'
+import { disposeCustomerDisplay, registerCustomerDisplayIpc } from './customerDisplay'
 import { initializeDatabase } from './database'
 import { registerIpcHandlers } from './ipc-handlers'
+import { registerUpdater } from './updater'
 
 // Must run before app.ready — avoids Windows cache lock spam when a prior
  // Electron instance still holds %AppData%/foodma-desktop/Cache.
@@ -18,8 +20,7 @@ if (!gotSingleInstanceLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    const windows = BrowserWindow.getAllWindows()
-    const mainWindow = windows[0]
+    const mainWindow = getMainAppWindow() ?? BrowserWindow.getAllWindows()[0]
     if (!mainWindow) {
       createAppWindow()
       return
@@ -34,6 +35,8 @@ if (!gotSingleInstanceLock) {
     try {
       initializeDatabase()
       registerIpcHandlers()
+      registerUpdater()
+      registerCustomerDisplayIpc()
     } catch (error) {
       console.error('Failed to initialize app:', error)
     }
@@ -57,8 +60,13 @@ if (!gotSingleInstanceLock) {
   })
 
   app.on('window-all-closed', () => {
+    disposeCustomerDisplay()
     if (process.platform !== 'darwin') {
       app.quit()
     }
+  })
+
+  app.on('before-quit', () => {
+    disposeCustomerDisplay()
   })
 }

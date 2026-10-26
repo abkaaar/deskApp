@@ -24,7 +24,9 @@
     "build:unpack": "run-s vite:build:app electron:build:dir",
     "build:win": "run-s vite:build:app electron:build:win",
     "build:mac": "run-s vite:build:app electron:build:mac",
-    "build:linux": "run-s vite:build:app electron:build:linux"
+    "build:linux": "run-s vite:build:app electron:build:linux",
+    "electron:publish:win": "electron-builder --win --publish always",
+    "release:win": "run-s vite:build:app electron:publish:win"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",

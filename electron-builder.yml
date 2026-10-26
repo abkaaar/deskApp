@@ -41,7 +41,9 @@ linux:
 appImage:
   artifactName: Foodpos-${version}.${ext}
 npmRebuild: false
+# Publish: set GH_TOKEN (repo scope), bump package.json version, then `npm run release:win`
 publish:
   provider: github
   owner: abkaaar
   repo: deskApp
+  releaseType: release

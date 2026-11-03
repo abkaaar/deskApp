@@ -154,6 +154,18 @@ export async function recordRegisterSale(input: {
   }
 
   const session = mapSession(row as Record<string, unknown>)
+
+  // Idempotent: same order must not inflate totals on flush retries.
+  if (input.orderId && !input.hold) {
+    const already = await hasRegisterEventForOrder(
+      input.sessionId,
+      input.vendorId,
+      input.hold ? 'hold' : 'sale',
+      input.orderId,
+    )
+    if (already) return session
+  }
+
   const totals = { ...session.totals_json }
   const amount = roundMoney(Math.max(0, input.amount))
 
@@ -200,6 +212,28 @@ export async function recordRegisterSale(input: {
   return mapSession(updated as Record<string, unknown>)
 }
 
+async function hasRegisterEventForOrder(
+  sessionId: string,
+  vendorId: string,
+  eventType: RegisterEventType,
+  orderId: string,
+): Promise<boolean> {
+  const supabase = getSupabaseClient()
+  const { data, error } = await supabase
+    .from('register_session_events')
+    .select('id, payload')
+    .eq('session_id', sessionId)
+    .eq('vendor_id', vendorId)
+    .eq('event_type', eventType)
+    .limit(80)
+
+  if (error || !data) return false
+  return data.some((row) => {
+    const payload = row.payload as { order_id?: string } | null
+    return payload?.order_id != null && String(payload.order_id) === String(orderId)
+  })
+}
+
 export async function recordRegisterRefund(input: {
   sessionId: string
   vendorId: string
@@ -217,6 +251,16 @@ export async function recordRegisterRefund(input: {
     .maybeSingle()
 
   if (error || !row) return null
+
+  if (input.orderId) {
+    const already = await hasRegisterEventForOrder(
+      input.sessionId,
+      input.vendorId,
+      'refund',
+      input.orderId,
+    )
+    if (already) return mapSession(row as Record<string, unknown>)
+  }
 
   const session = mapSession(row as Record<string, unknown>)
   if (session.status !== 'open') return session

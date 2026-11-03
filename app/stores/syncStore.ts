@@ -3,8 +3,10 @@ import { create } from 'zustand'
 import {
   flushSaleOutbox,
   getAttentionCount,
+  getFailedSales,
   getOutboxCount,
   isBrowserOffline,
+  type OutboxSale,
 } from '@/lib/checkout/saleOutbox'
 import { getSupabaseClient } from '@/lib/supabase/client'
 
@@ -25,6 +27,7 @@ type SyncState = {
   attentionCount: number
   flushing: boolean
   lastError: string | null
+  failedSales: OutboxSale[]
   refresh: () => void
   /** Probe connectivity, then flush. Pass retryFailed on manual Cloud click. */
   flush: (opts?: { retryFailed?: boolean; probe?: boolean }) => Promise<FlushResult>
@@ -59,12 +62,14 @@ export const useSyncStore = create<SyncState>((set, get) => ({
   attentionCount: typeof window !== 'undefined' ? getAttentionCount() : 0,
   flushing: false,
   lastError: null,
+  failedSales: typeof window !== 'undefined' ? getFailedSales() : [],
 
   refresh: () => {
     set({
       online: !isBrowserOffline(),
       pendingCount: getOutboxCount(),
       attentionCount: getAttentionCount(),
+      failedSales: getFailedSales(),
     })
   },
 
@@ -116,6 +121,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
         pendingCount: result.remaining,
         attentionCount: result.attention,
         lastError: result.lastError ?? null,
+        failedSales: getFailedSales(),
       })
       return { ...result, online: true }
     } catch (error) {
@@ -125,6 +131,7 @@ export const useSyncStore = create<SyncState>((set, get) => ({
         pendingCount: getOutboxCount(),
         attentionCount: getAttentionCount(),
         lastError: message,
+        failedSales: getFailedSales(),
       })
       return {
         flushed: 0,

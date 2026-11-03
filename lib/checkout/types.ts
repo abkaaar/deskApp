@@ -86,4 +86,6 @@ export interface PosOrderResult {
   error?: string
   /** When true, client may queue offline and retry. When false, keep cart and show error. */
   retryable?: boolean
+  /** False when order exists but inventory ledger deduct still needs attention/retry. */
+  ledgerSynced?: boolean
 }

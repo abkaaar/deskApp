@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { useAuthStore } from '@/app/stores/authStore'
+import { useRegisterStore } from '@/app/stores/registerStore'
 import { useSyncStore } from '@/app/stores/syncStore'
 import { pushCustomerDisplaySnapshot } from '@/lib/checkout/customerDisplayMirror'
 import { formatCurrency, parseKeypadAmount } from '@/lib/checkout/format'
@@ -33,6 +34,8 @@ type CardPhase = 'idle' | 'initiated'
 
 export function PaymentDialog({ open, onClose }: PaymentDialogProps) {
   const profile = useAuthStore((s) => s.profile)
+  const registerSession = useRegisterStore((s) => s.session)
+  const recordRegister = useRegisterStore((s) => s.recordSale)
   const total = useCheckoutStore((s) => s.getTotal())
   const cashTendered = useCheckoutStore((s) => s.cashTendered)
   const setCashTendered = useCheckoutStore((s) => s.setCashTendered)
@@ -136,6 +139,7 @@ export function PaymentDialog({ open, onClose }: PaymentDialogProps) {
       tableId: snapshot.tableId,
       discount: snapshot.discount,
       posExternalId,
+      registerSessionId: registerSession?.id ?? null,
       paymentReference: needsReference || method === 'card' ? paymentReference.trim() || null : null,
       cashTendered: method === 'cash' ? tenderedAmount : null,
       changeDue: method === 'cash' ? changeDue : null,
@@ -175,6 +179,18 @@ export function PaymentDialog({ open, onClose }: PaymentDialogProps) {
           description: 'It will sync automatically when you are back online.',
         })
         return
+      }
+
+      if (registerSession?.id) {
+        const regMethod =
+          method === 'card' || method === 'transfer' || method === 'wallet' ? method : 'cash'
+        await recordRegister({
+          vendorId: profile.id,
+          actorId: profile.id,
+          orderId: result.orderId,
+          method: regMethod,
+          amount: snapshot.total,
+        })
       }
 
       const settings = await loadReceiptSettings()

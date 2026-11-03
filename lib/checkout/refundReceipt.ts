@@ -96,6 +96,53 @@ function receiptPaymentLabel(paymentStatus?: string | null): string {
   return 'UNPAID'
 }
 
+/** Load line_items (+ post titles) when the order payload omitted them. */
+export async function ensureOrderLineItems(order: Order): Promise<Order> {
+  if ((order.line_items?.length ?? 0) > 0) {
+    return {
+      ...order,
+      line_items: order.line_items!.map((line) => ({
+        ...line,
+        post: Array.isArray(line.post) ? line.post[0] : line.post,
+        quantity: Number(line.quantity) || 0,
+        unit_price: Number(line.unit_price) || 0,
+        subtotal:
+          Number(line.subtotal) ||
+          (Number(line.unit_price) || 0) * (Number(line.quantity) || 0),
+      })),
+    }
+  }
+
+  const supabase = getSupabaseClient()
+  const { data } = await supabase
+    .from('order_line_items')
+    .select(
+      'id, order_id, post_id, quantity, unit_price, subtotal, notes, selected_addons, created_at, post:posts(id, title, image_url, price)',
+    )
+    .eq('order_id', order.id)
+
+  const line_items = (data ?? []).map((row) => {
+    const postRaw = row.post as { title?: string } | { title?: string }[] | null
+    const post = Array.isArray(postRaw) ? postRaw[0] : postRaw
+    const quantity = Number(row.quantity) || 0
+    const unit_price = Number(row.unit_price) || 0
+    return {
+      id: String(row.id),
+      order_id: String(row.order_id),
+      post_id: row.post_id != null ? String(row.post_id) : null,
+      quantity,
+      unit_price,
+      subtotal: Number(row.subtotal) || unit_price * quantity,
+      notes: (row.notes as string | null) ?? null,
+      selected_addons: row.selected_addons,
+      created_at: String(row.created_at),
+      post,
+    }
+  })
+
+  return { ...order, line_items: line_items as Order['line_items'] }
+}
+
 export function buildReceiptText(order: Order, restaurantName?: string | null): string {
   const meta = parsePosNotes(order.notes)
   const lines = order.line_items ?? []
@@ -114,9 +161,17 @@ export function buildReceiptText(order: Order, restaurantName?: string | null): 
     parts.push(`Table: ${meta.tableId}`)
   }
   parts.push('----------------')
-  for (const line of lines) {
-    const title = line.post?.title || line.notes || 'Item'
-    parts.push(`${line.quantity} x ${title}  ₦${Number(line.subtotal).toLocaleString()}`)
+  if (lines.length === 0) {
+    parts.push('(No line items)')
+  } else {
+    for (const line of lines) {
+      const title = line.post?.title || line.notes || 'Item'
+      const qty = Number(line.quantity) || 0
+      const unit = Number(line.unit_price) || 0
+      const lineTotal = Number(line.subtotal) || unit * qty
+      const unitBit = unit > 0 ? ` @ ₦${unit.toLocaleString()}` : ''
+      parts.push(`${qty} x ${title}${unitBit}  ₦${lineTotal.toLocaleString()}`)
+    }
   }
   if ((order.promo_discount ?? 0) > 0) {
     parts.push(`Discount: -₦${Number(order.promo_discount).toLocaleString()}`)

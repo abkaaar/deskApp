@@ -48,6 +48,8 @@ export function MenuItemCard({ item, onEdit, onToggleAvailability }: MenuItemCar
           <div className="text-xs text-muted-foreground">
             {outOfStock ? (
               <span className="text-destructive">Out of stock</span>
+            ) : !isAvailable ? (
+              <span className="text-warning">Hidden</span>
             ) : item.stock_quantity != null ? (
               <span>{item.stock_quantity} in stock</span>
             ) : (

@@ -59,6 +59,15 @@ export class OrderService {
           post: unwrapRelation(order.post),
           buyer: unwrapRelation(order.buyer),
           delivery: deliveriesMap[String(order.id)] ?? undefined,
+          line_items: (order.line_items ?? []).map((line) => ({
+            ...line,
+            post: unwrapRelation(line.post),
+            quantity: Number(line.quantity) || 0,
+            unit_price: Number(line.unit_price) || 0,
+            subtotal:
+              Number(line.subtotal) ||
+              (Number(line.unit_price) || 0) * (Number(line.quantity) || 0),
+          })),
         }
       })
 

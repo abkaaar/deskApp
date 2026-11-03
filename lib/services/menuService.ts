@@ -54,12 +54,18 @@ export class MenuService {
         return { success: false, error: 'You can only update your own menu items' }
       }
 
+      // Merchant availability toggles clear stock-forced flag so restock won't override hide.
+      const payload: Record<string, unknown> = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      }
+      if (typeof updates.is_available === 'boolean') {
+        payload.stock_forced_unavailable = false
+      }
+
       const { error: updateError } = await supabase
         .from('posts')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
+        .update(payload)
         .eq('id', postId)
         .eq('user_id', vendorId)
         .is('deleted_at', null)

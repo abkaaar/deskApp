@@ -158,6 +158,10 @@ export function RecordMovementSheet({
                 inputMode="decimal"
                 placeholder="Optional purchase cost"
               />
+              <p className="text-[11px] text-muted-foreground">
+                Purchase cost updates on-hand value with a weighted average (not a fixed master
+                list price). Enter the actual invoice unit cost for this receipt.
+              </p>
             </div>
           )}
 

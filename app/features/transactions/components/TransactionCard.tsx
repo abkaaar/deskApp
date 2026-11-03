@@ -4,12 +4,17 @@ import { toast } from 'sonner'
 import { Badge } from '@/app/components/ui/badge'
 import { useAuthStore } from '@/app/stores/authStore'
 import { formatCurrency } from '@/lib/checkout/format'
+import {
+  ensureOrderLineItems,
+  refundPosOrder,
+  type RefundStockOutcome,
+} from '@/lib/checkout/refundReceipt'
 import { buildReceiptText, printReceiptText, shareReceiptText } from '@/lib/receipt/receiptService'
-import { refundPosOrder } from '@/lib/checkout/refundReceipt'
 import { formatOrderId, getStatusLabel } from '@/lib/orders/status'
 import { cn } from '@/lib/utils'
 
 import type { TransactionRow } from '../hooks/useVendorTransactions'
+import { RefundDialog } from './RefundDialog'
 
 type TransactionCardProps = {
   row: TransactionRow
@@ -37,55 +42,49 @@ export function TransactionCard({ row, onChanged }: TransactionCardProps) {
   const { order, source, paymentMethod, customerLabel } = row
   const profile = useAuthStore((s) => s.profile)
   const [busy, setBusy] = useState(false)
+  const [refundOpen, setRefundOpen] = useState(false)
 
   const canRefund =
     source === 'pos' &&
     order.payment_status === 'paid' &&
     (profile?.role === 'vendor' || profile?.role === 'premium' || !profile?.role)
 
+  const restaurantName =
+    profile?.business_name || profile?.name || profile?.username
+
   const showReceipt = async () => {
-    const text = buildReceiptText(
-      order,
-      profile?.business_name || profile?.name || profile?.username,
-    )
+    const withLines = await ensureOrderLineItems(order)
+    const text = buildReceiptText(withLines, restaurantName)
     await shareReceiptText(text)
   }
 
-  const printReceipt = () => {
-    const text = buildReceiptText(
-      order,
-      profile?.business_name || profile?.name || profile?.username,
-    )
+  const printReceipt = async () => {
+    const withLines = await ensureOrderLineItems(order)
+    const text = buildReceiptText(withLines, restaurantName)
     printReceiptText(text)
   }
 
-  const handleRefund = async () => {
+  const handleRefundConfirm = async (input: {
+    stockOutcome: RefundStockOutcome
+    reason: string
+  }) => {
     if (!profile?.id || !canRefund || busy) return
-    if (!window.confirm('Refund this sale? This cannot be undone.')) return
-    const approved = window.confirm(
-      'Manager / owner approval required to continue.\n\nOK = approved\nCancel = abort refund',
-    )
-    if (!approved) return
-    const returned = window.confirm(
-      'Was sellable stock physically returned?\n\nOK = restore stock\nCancel = do not restore (consumed / damaged / not returned)',
-    )
-    const reason =
-      window.prompt('Refund reason (required for audit)', '')?.trim() || undefined
-    if (!reason) {
-      toast.error('Enter a refund reason to continue')
-      return
-    }
     setBusy(true)
     try {
       const result = await refundPosOrder(order.id, profile.id, {
-        stockOutcome: returned ? 'returned_sellable' : 'not_returned',
-        reason,
+        stockOutcome: input.stockOutcome,
+        reason: input.reason,
       })
       if (!result.ok) {
         toast.error(result.message)
         return
       }
-      toast.success(returned ? 'Sale refunded · stock restored' : 'Sale refunded')
+      toast.success(
+        input.stockOutcome === 'returned_sellable'
+          ? 'Sale refunded · stock restored'
+          : 'Sale refunded',
+      )
+      setRefundOpen(false)
       onChanged?.()
     } finally {
       setBusy(false)
@@ -150,7 +149,7 @@ export function TransactionCard({ row, onChanged }: TransactionCardProps) {
         </button>
         <button
           type="button"
-          onClick={printReceipt}
+          onClick={() => void printReceipt()}
           className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold"
         >
           Print
@@ -159,13 +158,22 @@ export function TransactionCard({ row, onChanged }: TransactionCardProps) {
           <button
             type="button"
             disabled={busy}
-            onClick={() => void handleRefund()}
+            onClick={() => setRefundOpen(true)}
             className="rounded-full border border-destructive/40 px-3 py-1.5 text-xs font-semibold text-destructive disabled:opacity-50"
           >
-            {busy ? 'Refunding…' : 'Refund'}
+            Refund
           </button>
         )}
       </div>
+
+      <RefundDialog
+        open={refundOpen}
+        onOpenChange={setRefundOpen}
+        busy={busy}
+        orderLabel={formatOrderId(order.id)}
+        amountLabel={formatCurrency(Number(order.total) || 0)}
+        onConfirm={(input) => void handleRefundConfirm(input)}
+      />
     </article>
   )
 }

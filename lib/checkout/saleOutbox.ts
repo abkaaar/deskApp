@@ -1,8 +1,35 @@
-import type { CreatePosOrderPayload, PosOrderResult } from './types'
+import type { CreatePosOrderPayload, PosOrderResult, PaymentMethod } from './types'
 import { createPosOrderFromCart } from './posCheckoutService'
+import { recordRegisterSale } from '@/lib/register/registerSessionService'
+import type { RegisterPaymentMethod } from '@/lib/register/types'
 
 const OUTBOX_KEY = 'foodma_desktop_sale_outbox_v1'
 const FAILED_KEY = 'foodma_desktop_sale_outbox_failed_v1'
+
+function toRegisterMethod(method: PaymentMethod): RegisterPaymentMethod {
+  if (method === 'card' || method === 'transfer' || method === 'wallet') return method
+  return 'cash'
+}
+
+async function recordRegisterAfterSale(
+  payload: CreatePosOrderPayload,
+  orderId: string,
+): Promise<void> {
+  const sessionId = payload.registerSessionId?.trim()
+  if (!sessionId) return
+  try {
+    await recordRegisterSale({
+      sessionId,
+      vendorId: payload.vendorId,
+      actorId: payload.vendorId,
+      orderId,
+      method: toRegisterMethod(payload.paymentMethod),
+      amount: Math.max(0, payload.total),
+    })
+  } catch (error) {
+    console.warn('[outbox] register sale record failed:', error)
+  }
+}
 
 export type OutboxSale = {
   id: string
@@ -103,15 +130,20 @@ export async function flushSaleOutbox(options?: {
         posExternalId: item.payload.posExternalId || item.id,
       })
       if (result.success && result.orderId) {
+        await recordRegisterAfterSale(item.payload, result.orderId)
         flushed += 1
       } else if (result.error === 'Sale already synced') {
         // Classifier fallback if insert race was not re-resolved to an id.
+        if (result.orderId) {
+          await recordRegisterAfterSale(item.payload, result.orderId)
+        }
         flushed += 1
       } else if (result.retryable) {
         lastError = result.error || 'Failed to sync offline sale'
         remaining.push({ ...item, lastError })
       } else {
         // Needs cashier attention — do not silently drop paid cash sales.
+        // Ledger-only failures keep orderId so retry can finish without duplicating the order.
         lastError = result.error || 'Failed to sync offline sale'
         newlyFailed.push({ ...item, lastError })
       }

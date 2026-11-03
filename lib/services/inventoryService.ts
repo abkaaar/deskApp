@@ -52,6 +52,10 @@ function mapMovementRow(row: Record<string, unknown>): InventoryMovement {
     movement_type: row.movement_type as InventoryMovement['movement_type'],
     direction: delta < 0 ? 'out' : 'in',
     quantity: Math.abs(delta),
+    unit_cost:
+      row.unit_cost != null && Number.isFinite(Number(row.unit_cost))
+        ? Number(row.unit_cost)
+        : null,
     notes: (row.notes as string | null) ?? null,
     reference_type: (row.reference_type as string | null) ?? null,
     reference_id: row.reference_id != null ? String(row.reference_id) : null,

@@ -75,7 +75,19 @@ export async function createPosOrderFromCart(
       .eq('pos_external_id', posExternalId)
       .maybeSingle()
     if (existingByExternalId?.id) {
-      return { success: true, orderId: String(existingByExternalId.id) }
+      const orderId = String(existingByExternalId.id)
+      // Retry ledger only (server is idempotent by order id) — never re-decrement posts.
+      const ledger = await ensurePosSaleLedger(payload.vendorId, orderId, payload.lineItems)
+      if (!ledger.ok) {
+        return {
+          success: false,
+          orderId,
+          error: ledger.error,
+          retryable: ledger.retryable,
+          ledgerSynced: false,
+        }
+      }
+      return { success: true, orderId, ledgerSynced: true }
     }
 
     const discount = Math.max(0, Math.min(payload.discount ?? 0, payload.subtotal))
@@ -361,22 +373,29 @@ export async function createPosOrderFromCart(
     }
 
     if (!isHold && catalogLines.length > 0) {
-      const saleLines = catalogLines.map((line) => ({
-        post_id: line.post_id,
-        quantity: line.quantity,
-        notes: line.notes ?? null,
-      }))
-      const { error: ledgerError } = await supabase.rpc('deduct_inventory_for_pos_sale', {
-        p_vendor_id: payload.vendorId,
-        p_lines: saleLines,
-        p_order_id: typeof order.id === 'number' ? order.id : Number(order.id),
-      })
-      if (ledgerError) {
-        console.warn('Inventory ledger deduct failed:', ledgerError.message)
+      const ledger = await ensurePosSaleLedger(
+        payload.vendorId,
+        String(order.id),
+        catalogLines.map((line) => ({
+          post_id: line.post_id,
+          quantity: line.quantity,
+          notes: line.notes ?? null,
+          unit_price: line.unit_price,
+          subtotal: line.subtotal,
+        })),
+      )
+      if (!ledger.ok) {
+        return {
+          success: false,
+          orderId: String(order.id),
+          error: ledger.error,
+          retryable: ledger.retryable,
+          ledgerSynced: false,
+        }
       }
     }
 
-    return { success: true, orderId: String(order.id) }
+    return { success: true, orderId: String(order.id), ledgerSynced: true }
   } catch (error) {
     console.error('Error in createPosOrderFromCart:', error)
     for (const prev of decrementedPosts) {
@@ -389,4 +408,55 @@ export async function createPosOrderFromCart(
     const classified = classifyCheckoutError(message, isHold)
     return { success: false, error: classified.error, retryable: classified.retryable }
   }
+}
+
+type LedgerLine = {
+  post_id?: string | null
+  quantity: number
+  notes?: string | null
+}
+
+/**
+ * Kitchen/BOM ledger deduct. Idempotent by p_order_id (server migration).
+ * Soft-migrate / missing RPC → treated as ok (no inventory items / older schemas).
+ */
+async function ensurePosSaleLedger(
+  vendorId: string,
+  orderId: string,
+  lines: LedgerLine[],
+): Promise<{ ok: true } | { ok: false; error: string; retryable: boolean }> {
+  const catalog = lines.filter((l) => l.post_id && Number(l.quantity) > 0)
+  if (catalog.length === 0) return { ok: true }
+
+  const supabase = getSupabaseClient()
+  const saleLines = catalog.map((line) => ({
+    post_id: line.post_id,
+    quantity: line.quantity,
+    notes: line.notes ?? null,
+  }))
+  const numericId = Number(orderId)
+  const { error: ledgerError } = await supabase.rpc('deduct_inventory_for_pos_sale', {
+    p_vendor_id: vendorId,
+    p_lines: saleLines,
+    p_order_id: Number.isFinite(numericId) ? numericId : null,
+  })
+
+  if (!ledgerError) return { ok: true }
+
+  const msg = ledgerError.message || 'Inventory ledger deduct failed'
+  const lower = msg.toLowerCase()
+  if (
+    lower.includes('does not exist') ||
+    lower.includes('schema cache') ||
+    lower.includes('permission denied') ||
+    lower.includes('42501') ||
+    lower.includes('not authorized')
+  ) {
+    // Soft-migrate / no inventory feature — do not block POS sync.
+    console.warn('Inventory ledger deduct skipped:', msg)
+    return { ok: true }
+  }
+
+  const classified = classifyCheckoutError(msg, false)
+  return { ok: false, error: classified.error, retryable: classified.retryable }
 }

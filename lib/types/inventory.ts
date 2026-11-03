@@ -90,6 +90,7 @@ export interface InventoryMovement {
   movement_type: InventoryMovementType
   direction: InventoryMovementDirection
   quantity: number
+  unit_cost?: number | null
   notes: string | null
   reference_type?: string | null
   reference_id?: string | null

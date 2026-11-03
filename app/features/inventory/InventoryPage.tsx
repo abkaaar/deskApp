@@ -188,6 +188,7 @@ export function InventoryPage() {
                 <TableHead>Item</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Qty</TableHead>
+                <TableHead>Unit cost</TableHead>
                 <TableHead>Order / ref</TableHead>
                 <TableHead>Staff</TableHead>
                 <TableHead>When</TableHead>
@@ -203,6 +204,11 @@ export function InventoryPage() {
                   <TableCell>
                     {movement.direction === 'out' ? '−' : '+'}
                     {movement.quantity}
+                  </TableCell>
+                  <TableCell className="tabular-nums text-muted-foreground">
+                    {movement.unit_cost != null
+                      ? `₦${Number(movement.unit_cost).toLocaleString()}`
+                      : '—'}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {movement.reference_id

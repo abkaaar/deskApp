@@ -71,6 +71,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps) {
   const attentionCount = useSyncStore((s) => s.attentionCount)
   const flushing = useSyncStore((s) => s.flushing)
   const lastError = useSyncStore((s) => s.lastError)
+  const failedSales = useSyncStore((s) => s.failedSales)
   const flush = useSyncStore((s) => s.flush)
   const bindBrowserListeners = useSyncStore((s) => s.bindBrowserListeners)
 
@@ -118,11 +119,16 @@ export function AppSidebar({ collapsed, onToggleCollapsed }: AppSidebarProps) {
       return
     }
     if (result.attention > 0 || result.remaining > 0) {
-      toast.error(result.lastError || 'Could not sync all sales', {
-        description:
-          result.attention > 0
-            ? `${result.attention} need attention.`
-            : `${result.remaining} still pending.`,
+      const failed = failedSales[0]
+      const detail =
+        failed?.lastError ||
+        result.lastError ||
+        (result.attention > 0
+          ? `${result.attention} sale${result.attention === 1 ? '' : 's'} need attention — tap Cloud sync again to retry.`
+          : `${result.remaining} still pending.`)
+      toast.error(result.attention > 0 ? 'Sales need attention' : 'Could not sync all sales', {
+        description: detail,
+        duration: 8_000,
       })
       return
     }

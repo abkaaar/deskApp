@@ -81,7 +81,30 @@ export function createAppWindow(): void {
   }
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    const url = (details.url || '').trim()
+    // Allow blank / about:blank popups used by receipt print (window.open + print).
+    if (
+      !url ||
+      url === 'about:blank' ||
+      url.startsWith('about:blank') ||
+      url === 'about:srcdoc'
+    ) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 420,
+          height: 640,
+          autoHideMenuBar: true,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+          },
+        },
+      }
+    }
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      void shell.openExternal(url)
+    }
     return { action: 'deny' }
   })
 

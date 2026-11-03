@@ -1,6 +1,6 @@
 {
   "name": "foodma-desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Foodpos — restaurant POS and operations for the Foodma ecosystem",
   "author": "Foodma",
   "main": "./out/main/main.js",
